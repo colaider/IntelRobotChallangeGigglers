@@ -26,10 +26,15 @@ def parse_args() -> argparse.Namespace:
 
 
 def overlay(image_path: Path, anomaly_map, out_path: Path) -> None:
+    """Blend the anomaly map over the image on a FIXED 0..1 scale.
+
+    Anomalib normalises maps so that 0.5 is the decision threshold. Per-image min-max
+    stretching would paint noise on good bricks red, so we only clip to [0, 1].
+    """
     img = cv2.imread(str(image_path))
     amap = np.asarray(anomaly_map, dtype=np.float32).squeeze()
     amap = cv2.resize(amap, (img.shape[1], img.shape[0]))
-    amap = (255 * (amap - amap.min()) / (np.ptp(amap) + 1e-8)).astype(np.uint8)
+    amap = (255 * np.clip(amap, 0.0, 1.0)).astype(np.uint8)
     heat = cv2.applyColorMap(amap, cv2.COLORMAP_JET)
     cv2.imwrite(str(out_path), cv2.addWeighted(img, 0.6, heat, 0.4, 0))
 
