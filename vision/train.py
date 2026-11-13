@@ -1,6 +1,6 @@
 """Train an anomaly model (PatchCore by default) on dataset/.
 
-Training uses dataset/training/good only; dataset/test/{good,marker} are for evaluation.
+Training uses dataset/training/good only; dataset/test/{good,defective} are for evaluation.
 
 Example:
     python vision/train.py --model patchcore
@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--name", default="bricks")
     p.add_argument("--normal-dir", default="training/good")
     p.add_argument("--normal-test-dir", default="test/good")
-    p.add_argument("--abnormal-dir", default="test/marker")
+    p.add_argument("--abnormal-dir", default="test/defective")
     p.add_argument("--model", choices=MODELS, default="patchcore")
     p.add_argument("--batch-size", type=int, default=8)
     p.add_argument("--num-workers", type=int, default=2)

@@ -167,5 +167,5 @@ Goal: learn the tool end to end on a tiny dataset before touching the robot.
 ## Conventions
 
 - Python code in `vision/` (anomaly), robot helpers in `robot/`, docs in `docs/`.
-- Photos for training/testing live in `dataset/` (committed on purpose, see `dataset/README.md`): `training/good`, `test/good`, `test/marker`. Do not commit `data/`, `results/`, model weights (`*.ckpt`, `*.xml`, `*.bin`).
+- Photos for training/testing live in `dataset/` (committed on purpose, see `dataset/README.md`): `training/good`, `test/good`, `test/defective`. Do not commit `data/`, `results/`, model weights (`*.ckpt`, `*.xml`, `*.bin`).
 - Keep scripts runnable with one command and documented in the README (reproducibility matters for the demo).

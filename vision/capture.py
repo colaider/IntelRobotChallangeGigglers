@@ -15,7 +15,7 @@ import cv2
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--split", choices=["training", "test"], default="training", help="dataset split")
-    p.add_argument("--cls", choices=["good", "marker"], required=True, help="class folder to save into")
+    p.add_argument("--cls", choices=["good", "defective"], required=True, help="class folder to save into")
     p.add_argument("--camera", type=int, default=0, help="camera index")
     p.add_argument("--width", type=int, default=1920)
     p.add_argument("--height", type=int, default=1080)

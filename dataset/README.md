@@ -7,7 +7,7 @@ One sub-folder per (face type × colour) later; for now a flat layout:
 dataset/
   training/good/     # only perfect bricks; used to train (PatchCore etc.)
   test/good/         # perfect bricks NOT in training; threshold tuning
-  test/marker/       # bricks with marker drawings; validation only
+  test/defective/       # defective bricks (e.g. marker drawings); validation only
 ```
 
 File names: `NNN.png`. Do not mix the same photo into training and test.
