@@ -1,0 +1,13 @@
+# datasets, results, model weights
+data/
+results/
+*.ckpt
+*.xml
+*.bin
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+.DS_Store

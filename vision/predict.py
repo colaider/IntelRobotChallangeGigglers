@@ -1,0 +1,53 @@
+"""Score a single image or a folder of images and save heatmap overlays.
+
+Example:
+    python vision/predict.py --ckpt results/.../model.ckpt --input data/bricks/marker --out results/predict
+"""
+
+import argparse
+from pathlib import Path
+
+import cv2
+import numpy as np
+from anomalib.engine import Engine
+from anomalib.models import Padim, Patchcore, Stfpm
+
+MODELS = {"patchcore": Patchcore, "padim": Padim, "stfpm": Stfpm}
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--ckpt", type=Path, required=True)
+    p.add_argument("--input", type=Path, required=True, help="image file or folder")
+    p.add_argument("--model", choices=MODELS, default="patchcore")
+    p.add_argument("--accelerator", default="cpu")
+    p.add_argument("--out", type=Path, default=Path("results/predict"))
+    return p.parse_args()
+
+
+def overlay(image_path: Path, anomaly_map, out_path: Path) -> None:
+    img = cv2.imread(str(image_path))
+    amap = np.asarray(anomaly_map, dtype=np.float32).squeeze()
+    amap = cv2.resize(amap, (img.shape[1], img.shape[0]))
+    amap = (255 * (amap - amap.min()) / (np.ptp(amap) + 1e-8)).astype(np.uint8)
+    heat = cv2.applyColorMap(amap, cv2.COLORMAP_JET)
+    cv2.imwrite(str(out_path), cv2.addWeighted(img, 0.6, heat, 0.4, 0))
+
+
+def main() -> None:
+    args = parse_args()
+    args.out.mkdir(parents=True, exist_ok=True)
+    engine = Engine(default_root_dir=args.out, accelerator=args.accelerator)
+    preds = engine.predict(model=MODELS[args.model](), data_path=args.input, ckpt_path=args.ckpt)
+
+    print(f"{'image':40s} {'score':>7s}  label")
+    for batch in preds:
+        for i, path in enumerate(batch.image_path):
+            score = float(batch.pred_score[i])
+            label = "defective" if bool(batch.pred_label[i]) else "good"
+            print(f"{Path(path).name:40s} {score:7.3f}  {label}")
+            overlay(Path(path), batch.anomaly_map[i].cpu().numpy(), args.out / f"{Path(path).stem}_heat.png")
+
+
+if __name__ == "__main__":
+    main()
