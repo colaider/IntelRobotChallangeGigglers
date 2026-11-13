@@ -1,7 +1,7 @@
 """Score a single image or a folder of images and save heatmap overlays.
 
 Example:
-    python vision/predict.py --ckpt results/.../model.ckpt --input data/bricks/marker --out results/predict
+    python vision/predict.py --ckpt results/.../model.ckpt --input dataset/test/defective --out results/predict
 """
 
 import argparse
