@@ -1,5 +1,17 @@
 # Vision: anomaly detection for the bricks
 
+## Quick start (capture)
+
+Run in **Terminal.app** (not via `!` in Claude Code): the preview window needs the keyboard
+for SPACE / Q, and the script must run from the repo root with the venv active.
+
+```bash
+cd ~/projects/IntelRobotChallangeGigglers && source .venv/bin/activate && python vision/capture.py --split training --cls good --crop 700
+```
+
+macOS asks for camera access for Terminal on the first run. Step-by-step guide for the
+photographer: [`docs/photo-guide.md`](../docs/photo-guide.md).
+
 ## Setup (once)
 
 Python 3.12. From the repo root:
@@ -26,8 +38,9 @@ python vision/capture.py --split test --cls defective --crop 700
 
 - The green box in the preview is what gets saved. Place the brick so it fills most of it.
   Models resize everything to 256x256, so a tight square crop matters.
-- Keep the same camera, light, background, distance and `--crop` for all photos.
-- Files are named `<date>_<time>_<NNN>.png`, so several people can add photos without clashes.
+- Keep the same camera, light, background, distance and `--crop` for all three folders.
+- Files are named `<date>_<time>_c<crop>_<NNN>.png`, so several people can add photos without
+  clashes, and a different crop shows up in the name (`ls dataset/*/* | grep -v _c700_`).
 - Layout and rules: [`dataset/README.md`](../dataset/README.md).
 - Aim for 20–30 in `training/good` and at least 10 each in `test/good` and `test/defective`
   (half of `test/` is used to pick the threshold).

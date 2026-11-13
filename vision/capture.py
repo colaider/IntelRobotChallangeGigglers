@@ -5,8 +5,8 @@ is saved. Put the brick so that it fills most of the box. The models resize ever
 to 256x256, so a square crop tight around the brick keeps the marker lines visible and
 avoids squashing a 16:9 frame.
 
-Files are named <YYYYmmdd_HHMMSS>_<NNN>.png, so photos taken by different people on
-different machines never collide when merged in git.
+Files are named <YYYYmmdd_HHMMSS>_c<crop>_<NNN>.png (e.g. 20261114_101530_c700_000.png),
+so photos from different machines never collide in git and a mismatched crop is visible.
 
 SPACE saves a frame, Q (or ESC) quits.
 
@@ -75,7 +75,8 @@ def main() -> None:
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord(" "):
-            path = out_dir / f"{session}_{saved:03d}.png"
+            tag = "full" if args.crop == 0 else f"c{x1 - x0}"
+            path = out_dir / f"{session}_{tag}_{saved:03d}.png"
             cv2.imwrite(str(path), frame[y0:y1, x0:x1])
             print(f"saved {path}")
             saved += 1

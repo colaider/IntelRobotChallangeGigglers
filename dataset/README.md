@@ -10,5 +10,5 @@ dataset/
   test/defective/    # defective bricks (e.g. marker drawings); validation only
 ```
 
-File names: `<date>_<time>_<NNN>.png` (set by capture.py, unique across machines). Do not mix the same photo into training and test.
+File names: `<date>_<time>_c<crop>_<NNN>.png` (set by capture.py, unique across machines). Do not mix the same photo into training and test.
 Capture with: `python vision/capture.py --split training --cls good --crop 700` (see vision/README.md)
