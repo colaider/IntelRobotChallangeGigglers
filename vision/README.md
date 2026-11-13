@@ -65,3 +65,47 @@ Prints score and label per image and writes `*_heat.png`. Heatmaps use a fixed s
 score 0.5 is the decision threshold, so a good brick should stay blue.
 
 `--accelerator cpu` is the default (MPS on macOS crashes in torch).
+
+## 4. Synthetic defects (evaluation only)
+
+```bash
+python vision/synth_defects.py --input dataset/test/good --copy-good dataset/training/good \
+    --out dataset_synth --per-image 3
+python vision/train.py --root dataset_synth
+```
+
+Draws marker-like lines, curves, dots, tiny 1–2 mm dots, scribbles and edge defects on the
+brick (found by colour saturation), with pixel masks in `test/masks/`. `dataset_synth/` is
+gitignored. Never put synthetic images into `training/`.
+
+## 5. Export to OpenVINO (FP32 / FP16 / INT8)
+
+```bash
+python vision/export.py --ckpt results/Patchcore/bricks/v0/weights/lightning/model.ckpt
+```
+
+Writes `results/export/<model>/{fp32,fp16,int8}/weights/openvino/model.xml`. INT8 = NNCF
+post-training quantisation calibrated on `training/good`. Models are exported with a static
+input `[1, 3, 256, 256]` (Anomalib 2.7's dynamic export bakes in batch=2 for PatchCore; static
+shapes are also what the NPU needs), so frames must be resized to 256×256 first — use
+`benchmark.Scorer`, which does it.
+
+## 6. Benchmark CPU / GPU / NPU
+
+```bash
+python vision/benchmark.py --models results/export --devices CPU GPU NPU
+benchmark_app -m results/export/patchcore/int8/weights/openvino/model.xml -d NPU   # raw inference
+```
+
+Per model × device: p50/p95 latency (incl. resize + pre/post-processing), FPS, AUROC, F1,
+compile time, size → `results/benchmark.csv`. Devices missing on the machine are skipped
+(a Mac only has CPU).
+
+## 7. Compare models
+
+```bash
+python vision/compare.py --models patchcore padim stfpm --precision int8 --devices CPU GPU NPU
+```
+
+Trains, exports and benchmarks each model → table + `results/compare/compare.csv`.
+`efficient_ad` (downloads ImageNette ~1.5 GB) and `dinomaly` (heavy) are opt-in.

@@ -11,3 +11,7 @@ __pycache__/
 *.pyc
 
 .DS_Store
+
+# generated synthetic defects
+dataset_synth/
+openvino_cache/
