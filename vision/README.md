@@ -45,10 +45,28 @@ python vision/capture.py --split test --cls defective --crop 700
 - Aim for 20–30 in `training/good` and at least 10 each in `test/good` and `test/defective`
   (half of `test/` is used to pick the threshold).
 
+## 1b. Segment: find, straighten and crop the brick (recommended)
+
+```bash
+python vision/segment.py --root dataset --out dataset_seg
+```
+
+Finds the brick (Lab colour distance from the paper; `brick_mask_depth` is ready for the
+RealSense), cleans the mask with morphology (open, close, largest blob, fill holes), rotates
+the brick long-side-horizontal with the studs on top, crops it tight and paints the background
+flat grey. Check `dataset_seg/qa_masks.jpg` and `qa_crops.jpg` after every run. Then train with
+`--root dataset_seg`. The robot must call `segment.process()` on each frame before scoring.
+
+Background is not a plain sheet (brick in the gripper, table, cables)? Use `--mode scene`
+(colour regions + GrabCut, slower, ~1 s per photo). One photo, with every stage saved:
+`python vision/segment.py --image <photo> --out results/one --mode scene`.
+Results: [`docs/experiments.md`](../docs/experiments.md) (AUROC 0.89 -> 1.00 on our photos).
+
 ## 2. Train
 
 ```bash
 python vision/train.py                    # PatchCore on dataset/
+python vision/train.py --root dataset_seg # on segmented crops (better, see 1b)
 python vision/train.py --model padim
 ```
 
