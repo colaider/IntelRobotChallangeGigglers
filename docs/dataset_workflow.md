@@ -38,7 +38,7 @@ Team decision 2026-11-14. Collector with the **system Python** (`py`), everythin
 |---|---|---|---|---|---|
 | front RealSense D415 (inspection) | `ground` | 1920×1080 | 15 | off | brick is closer than the D415 depth range anyway |
 | gripper webcam | `gripper` | 1920×1080 (else 1280×720) | 30 | — | MJPEG (set automatically) |
-| top RealSense D415 (pick, VLA) | `top` | 640×480 | 30 | on | check with the VLA team before changing |
+| top RealSense D415 (pick, VLA) | `top` | 1920×1080 | 30 (15 if the check warns) | on, 848×480 (16:9 like the colour) | same resolution as the VLA policy uses |
 
 ```bash
 # 0. once: keep the old hall-background sessions out of the new dataset
@@ -50,11 +50,11 @@ py collection/run.py --list
 # 2. camera + USB check, nothing saved (warnings: USB 2, fps far below asked, 1080p without MJPEG
 #    -> move a camera to another USB controller, lower fps, then resolution)
 py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> --no-robot \
-    --check-only --check-seconds 5 --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=640x480@30
+    --check-only --check-seconds 5 --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=1920x1080@30 --rs-depth 848x480
 
 # 3. collect: one session per colour and label; press `a` once (fixed exposure); SPACE = capture
 py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> \
-    --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=640x480@30 --name red_good_a --label good
+    --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=1920x1080@30 --rs-depth 848x480 --name red_good_a --label good
 #    per colour: <colour>_good_a, <colour>_good_b (test only), <colour>_defective_a (--label defective,
 #    then `d` + defect number in the window). Inspection poses only, every face with BOTH cameras.
 
@@ -73,6 +73,11 @@ py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> \
 ```
 
 Share: `data/` is gitignored — zip the new sessions / shared drive; commit `dataset/faces.csv`.
+
+Notes: three cameras at 1080p is the heaviest USB load — the check in step 2 is mandatory (two
+RealSense on different USB controllers; lower fps before resolution). One camera can be opened by
+one program at a time: close Physical AI Studio while collecting; at runtime Studio (VLA) and the
+inspection must share frames from a single reader.
 
 ---
 

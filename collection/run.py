@@ -6,7 +6,7 @@ Run from the repo root with the system Python (needs a GUI OpenCV, not the Anoma
     py collection/run.py                                          # every RealSense (rs1, rs2...), no USB cams
     py collection/run.py --no-robot --label defective --defects dot line scratch
     py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=2 --no-robot --check-only \
-        --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=640x480@30   # USB / fps test, then exit
+        --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=1920x1080@30 --rs-depth 848x480  # USB test
 
 Collect at the resolution you will RUN at (default 640x480 everywhere): on a RealSense, 640x480
 is 4:3 and sees a narrower field than 1280x720 (16:9), so other modes give other pictures.
@@ -59,7 +59,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--size", default="640x480", help="default colour resolution WxH (per camera: --cam)")
     p.add_argument("--cam", nargs="*", default=[], metavar="NAME=WxH[@FPS][:nodepth]",
                    help="per-camera settings, e.g. ground=1920x1080@15:nodepth gripper=1920x1080@30 "
-                        "top=640x480@30 (recommended set, see docs/dataset_workflow.md)")
+                        "top=1920x1080@30 (recommended set, see docs/dataset_workflow.md)")
     p.add_argument("--check-seconds", type=float, default=3.0,
                    help="USB / frame-rate check after opening the cameras (0 = skip)")
     p.add_argument("--check-only", action="store_true", help="open the cameras, run the check, exit")
