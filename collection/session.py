@@ -31,9 +31,10 @@ MANIFEST_FIELDS = (["id", "time", "label", "defect", "color", "note", "sharpness
 
 
 def git_commit() -> str | None:
+    """Short HEAD of the repo that owns this file (not whatever cwd the collector was started from)."""
     try:
         return subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
-                              cwd=Path(__file__).parent, timeout=5).stdout.strip() or None
+                              cwd=Path(__file__).resolve().parents[1], timeout=5).stdout.strip() or None
     except (OSError, subprocess.SubprocessError):
         return None
 

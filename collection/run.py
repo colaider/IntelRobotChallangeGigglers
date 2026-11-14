@@ -15,9 +15,13 @@ Keys (click the window first):
     SPACE      capture (all cameras + depth + robot pose)
     h          hold the arm where it is / let it go limp again (pose by hand, then h, hands out)
     g / d      label good / defective        1-9  defect type (from --defects)
-    a          auto exposure + white balance ON/OFF on all cameras (collect with OFF)
+    a          auto exposure + white balance ON/OFF on all cameras
     [ / ]      exposure down / up (RealSense, manual mode)
     BACKSPACE  delete the last capture       q / ESC  quit (arm goes limp: hold it!)
+
+Exposure and white balance are locked (auto OFF) after the camera warmup by default —
+otherwise brightness/colour drift frame-to-frame and look like anomalies. Press `a` only
+if you need auto temporarily; SPACE refuses to save while auto is ON.
 """
 
 import argparse
@@ -66,7 +70,10 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--rs-depth", default="640x480", help="RealSense depth resolution WxH")
     p.add_argument("--no-robot", action="store_true")
     p.add_argument("--port", default=None, help="robot COM port (auto if only one)")
-    p.add_argument("--manual-exposure", action="store_true", help="start with auto exposure/WB OFF")
+    p.add_argument("--auto-exposure", action="store_true",
+                   help="keep auto exposure/WB ON (default: lock them after warmup — required for clean data)")
+    p.add_argument("--manual-exposure", action="store_true",
+                   help=argparse.SUPPRESS)  # old flag; locking is now the default
     p.add_argument("--min-sharpness", type=float, default=30,
                    help="warn below this Laplacian variance (scene dependent: plain backgrounds score low)")
     return p.parse_args(argv)
@@ -240,11 +247,7 @@ def compose(frames, cams, status: list[str], flash: bool) -> np.ndarray:
 
 def set_auto(cams, on: bool) -> None:
     for c in cams:
-        if isinstance(c, RealSenseCamera):
-            if bool(c.exposure_state().get("auto_exposure", 1.0)) != on:
-                c.toggle_auto()
-        else:
-            c.set_auto(on)
+        c.set_auto(on)
 
 
 def exposure_text(rs_cams) -> str:
@@ -274,9 +277,11 @@ def main(argv=None) -> None:
             robot.close()
         return
     rs_cams = [c for c in cams if isinstance(c, RealSenseCamera)]
-    auto = not args.manual_exposure
-    if not auto:
-        set_auto(cams, False)
+    # Warmup already ran with auto ON (settled values). Lock them unless --auto-exposure.
+    auto = bool(args.auto_exposure) and not args.manual_exposure
+    set_auto(cams, auto)
+    print(f"Exposure: {exposure_text(rs_cams)}"
+          + ("  (locked — press a only if you need auto)" if not auto else "  WARNING: auto ON — data will drift"))
 
     writer = SessionWriter(args.out, args.name, args.notes, cameras={c.name: c.info for c in cams},
                            robot={"port": robot.port, "alive_ids": robot.alive} if robot else {})
@@ -300,6 +305,13 @@ def main(argv=None) -> None:
                     msg = "Pick a defect type first (keys 1-9): " + " ".join(
                         f"{i + 1}={d}" for i, d in enumerate(args.defects[:9]))
                     continue
+                # Re-read sensors: refuse if any RealSense still reports auto (drift = fake anomalies).
+                # --auto-exposure opts out (debug only — do not use for dataset sessions).
+                sensor_auto = any(bool(c.exposure_state().get("auto_exposure", 0)) for c in rs_cams)
+                if not args.auto_exposure and (sensor_auto or auto):
+                    auto = True
+                    msg = "REFUSED: auto exposure still ON — press a to lock, then SPACE"
+                    continue
                 row = writer.save(frames, pose, label, defect if label == "defective" else "", args.color)
                 warn = []
                 for c in cams:
@@ -308,8 +320,6 @@ def main(argv=None) -> None:
                         warn.append(f"{c.name} OVEREXPOSED {q['overexposed_pct']}%")
                     if q["sharpness"] < args.min_sharpness:
                         warn.append(f"{c.name} low sharpness {q['sharpness']:.0f}")
-                if auto:
-                    warn.append("auto exposure is ON")
                 msg = f"saved {row['id']}  " + ("  ".join(warn) if warn else "ok")
                 flash_until = time.time() + 0.15
             elif key == ord("g"):

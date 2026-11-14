@@ -54,11 +54,13 @@ py collection/run.py --list
 py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> --no-robot \
     --check-only --check-seconds 5 --cam ground=640x480@30:nodepth gripper=640x480@30 top=640x480@30
 
-# 3. collect: one session per colour and label; press `a` once (fixed exposure); SPACE = capture
+# 3. collect: one session per colour and label; exposure locks after warmup (meta auto_*=0);
+#    SPACE refuses if auto is still ON. Check the status bar says fixed, not AUTO.
 py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> \
     --cam ground=640x480@30:nodepth gripper=640x480@30 top=640x480@30 --name red_good_a --label good
 #    per colour: <colour>_good_a, <colour>_good_b (test only), <colour>_defective_a (--label defective,
 #    then `d` + defect number in the window). Inspection poses only, every face with BOTH cameras.
+#    Must be on branch `vision` so session.json code_commit matches this collector.
 
 # 4. face labels: add rows, look at the sheets, fill `face` (front) and `gripper_face` (gripper)
 .venv/bin/python vision/sessions.py --add-missing
@@ -86,8 +88,11 @@ Full instructions: [`collection/README.md`](../collection/README.md). Must-dos:
   (`py -m pip install -r collection/requirements.txt`), training with the repo `.venv`
   (`vision/README.md` → Setup). Close Physical AI Studio / `so101_jog.py` first (COM port, cameras).
 - **Lock the setup before the first frame:** static matte backdrop behind the inspection spot,
-  diffuse light (shield room LEDs), press `a` once so exposure + white balance are fixed for the
-  whole session, camera never moves. One session = one sitting; new setup → new session.
+  diffuse light (shield room LEDs), camera never moves. The collector **locks exposure + white
+  balance after warmup** (status bar must not say AUTO; every `*_meta.json` must have
+  `auto_exposure` / `auto_white_balance` = 0.0). SPACE refuses to save while auto is ON. One
+  session = one sitting; new setup → new session. Collect on branch `vision` (`git checkout
+  vision && git pull`) so `session.json` → `code_commit` matches this code.
 - **Shoot in the exact runtime poses** (booth poses of the arm): after grasp from above
   (gripper sees the top), side face square to the front camera, roll 180° for the other side,
   gripper horizontal for the bottom; then regrasp 90° and repeat (`inspection_sequence.md`).
@@ -177,7 +182,8 @@ Write what you see into `docs/experiments.md`.
 
 ## Checklist for a new dataset
 
-- [ ] backdrop + light fixed, exposure/WB locked (`a`), camera not moved
+- [ ] backdrop + light fixed, exposure/WB locked (status bar fixed, meta auto_*=0), camera not moved
+- [ ] on branch `vision` (`session.json` code_commit matches collector)
 - [ ] frames in the runtime booth poses only; blurred / occluded ones deleted
 - [ ] per colour: ≥2 good sessions (one test-only) + 1 defective session with real marks
 - [ ] `dataset/faces.csv` filled for every new capture

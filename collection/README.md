@@ -79,18 +79,22 @@ py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> --n
 | `BACKSPACE` | delete the last capture |
 | `q` / `ESC` | quit (arm goes limp: hold it) |
 
-The window shows every camera in a row and each RealSense depth below it. Checks after every
-capture, per camera: overexposed (>1 % clipped pixels), low sharpness (`--min-sharpness`),
-auto exposure still on.
+The window shows every camera in a row and each RealSense depth below it. After warmup the
+collector **locks exposure + white balance** (status bar shows fixed numbers, not AUTO). SPACE
+refuses to save while any RealSense still reports auto — otherwise brightness/colour drift and
+the anomaly model treats it as a defect. Checks after every capture, per camera: overexposed
+(>1 % clipped pixels), low sharpness (`--min-sharpness`).
 
 Other options: `--no-robot`, `--no-realsense`, `--port COM5`, `--size 640x480`,
-`--rs-depth 640x480`, `--manual-exposure` (start with auto off), `--color red` (optional).
-Without `--rs`, every connected RealSense is used and named `rs1`, `rs2` (by serial).
+`--rs-depth 640x480`, `--auto-exposure` (keep auto ON — do not use for dataset collection),
+`--color red` (optional). Without `--rs`, every connected RealSense is used and named `rs1`,
+`rs2` (by serial). Collect on branch `vision` so `session.json` → `code_commit` tracks this
+collector.
 
 ## How to collect well
 
-1. Set up the light first (shield the room LEDs: they made most false alarms so far), then
-   press `a` once so exposure and white balance stay fixed for the whole session.
+1. Set up the light first (shield the room LEDs: they made most false alarms so far). Confirm
+   the status bar shows fixed exposure (not AUTO) before the first SPACE.
 2. **One session = one sitting.** Start a new session when the light, camera or brick set changes.
 3. Shoot good bricks in several sessions; keep **at least one good session only for testing**.
 4. Show bricks the way the robot will show them in the real run (same pose, same distance).

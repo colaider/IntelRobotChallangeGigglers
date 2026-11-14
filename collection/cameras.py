@@ -8,9 +8,9 @@ projector). What we save per capture:
 and once per session the colour intrinsics + depth scale (needed to turn pixels into 3-D).
 
 Exposure: auto exposure / auto white balance change brightness and colour from shot to shot,
-which an anomaly model sees as "different". Collect with them OFF (fixed values) once the
-light is set up; toggle_auto() / adjust_exposure() do that. The values in force at each
-capture are stored in its metadata.
+which an anomaly model sees as "different". The collector locks them OFF after warmup
+(set_auto(False)); toggle_auto() / adjust_exposure() are for the UI. Values in force at each
+capture are stored in its metadata (must be auto_*=0.0 in a clean session).
 """
 
 from dataclasses import dataclass, field
@@ -128,14 +128,18 @@ class RealSenseCamera:
                 st[key] = s.get_option(o)
         return st
 
-    def toggle_auto(self) -> bool:
-        """Switch auto exposure + auto white balance together. Returns the new 'auto' state."""
-        st = self.exposure_state()
-        new = 0.0 if st.get("auto_exposure", 1.0) else 1.0
+    def set_auto(self, on: bool) -> None:
+        """Force auto exposure + auto white balance to on/off (idempotent)."""
+        val = 1.0 if on else 0.0
         for opt in ("enable_auto_exposure", "enable_auto_white_balance"):
             if self._color_sensor.supports(self._opt(opt)):
-                self._color_sensor.set_option(self._opt(opt), new)
-        return bool(new)
+                self._color_sensor.set_option(self._opt(opt), val)
+
+    def toggle_auto(self) -> bool:
+        """Switch auto exposure + auto white balance together. Returns the new 'auto' state."""
+        new = not bool(self.exposure_state().get("auto_exposure", 1.0))
+        self.set_auto(new)
+        return new
 
     def adjust_exposure(self, factor: float) -> float | None:
         """Manual mode only: multiply exposure by factor (clamped to the sensor range)."""
