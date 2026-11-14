@@ -44,7 +44,7 @@ the laptop with OpenVINO (CPU / GPU / NPU).
 | 4 | Train on good bricks only | `train.py --seg scene` (PatchCore) | No defect examples needed; ~20 s training; a new colour can be taught in seconds |
 | 5 | Export + quantise | `export.py` (OpenVINO FP32/FP16/INT8) | INT8 ~11 % faster, same accuracy; static input 256×256 (needed for NPU) |
 | 6 | Measure | `benchmark.py`, `sensitivity.py`, `synth_defects.py` | Latency per device; detection rate per defect size / marker colour / brick colour |
-| 7 | Decide | thresholds + `uncertain` band | Uncertain bricks are re-inspected → fewer wrong sorts |
+| 7 | Decide | `calibrate.py` thresholds + `inspect_brick.py` | Per-face good / defective / uncertain, early exit per brick, JSON for the robot |
 
 **Per brick, face by face (rule confirmed by the judges):** the first face that is confidently
 defective ends the inspection → defective bowl, remaining faces are skipped. An `uncertain` face is

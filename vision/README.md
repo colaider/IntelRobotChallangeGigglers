@@ -190,3 +190,36 @@ python vision/compare.py --models patchcore padim stfpm --precision int8 --devic
 
 Trains, exports and benchmarks each model → table + `results/compare/compare.csv`.
 `efficient_ad` (downloads ImageNette ~1.5 GB) and `dinomaly` (heavy) are opt-in.
+
+## 8. Inspection decision for the robot (`inspect_brick.py`, `calibrate.py`)
+
+```bash
+# 1. thresholds from frames of THIS setup that were not used for training
+python vision/calibrate.py --xml <model.xml> --good dataset/raw/test/good \
+    --defective dataset/raw/test/defective --out results/calibration.json
+# 2. offline check: every image = a one-face brick
+python vision/inspect_brick.py --xml <model.xml> --calib results/calibration.json --folder dataset/raw/test
+# 3. one brick, faces in inspection order
+python vision/inspect_brick.py --xml <model.xml> --calib results/calibration.json --images f1.png f2.png f3.png
+```
+
+Per face: segment → model → **score on the brick** (model score scaled by how much of the heat-map
+peak lies on the eroded brick mask, so leftovers of the gripper do not count) → `good` (< low),
+`defective` (>= high) or `uncertain` (between, or the segmentation quality check failed).
+Per brick: faces in order with **early exit** — the first defective face ends the inspection
+(rule confirmed by the judges); an uncertain face is re-shot (`retries`); good only if every face
+is good. Output = JSON (decision, per-face scores, worst face, faces checked, early exit, timings).
+
+Robot code:
+
+```python
+from inspect_brick import Inspector
+insp = Inspector("model.xml", device="NPU", calib="results/calibration.json")
+res = insp.inspect_brick(lambda face, attempt: grab_frame_at_pose(face), faces=["side_A", "side_B", "top"])
+bowl = {"good": "good", "defective": "defective"}.get(res["decision"], "regrasp")
+```
+
+`calibrate.py`: low = highest clean score + margin; high = halfway to the lowest defective score
+(or low + band without defective frames); warns when defective frames score below low.
+Named `inspect_brick.py` (not `inspect.py`) so it does not shadow Python's `inspect` module.
+

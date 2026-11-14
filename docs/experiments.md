@@ -299,3 +299,16 @@ studs in shadow, drops greenish/skin slivers) and smaller side slack (1.5 %). Le
 right wedge smaller but not gone; #20 stays flagged `uncertain` (11 % trimmed). Other 29 crops
 unchanged. Tried and dropped: a strict colour core as the body box (shading broke it → studs cut
 on 12/30 frames). Metrics unchanged: AUROC 1.00, 0/10 false alarms, 15/15, also shifted.
+
+## 2026-11-14 — inspection decision (`inspect_brick.py`, `calibrate.py`), branch `integration`
+
+Model: PatchCore FP16 trained on segmented gripper frames (20 train). Calibrated on the 10 held-out
+clean frames + 15 synthetic defects (same frames are scored below → optimistic, real station frames
+needed): low 0.12 (clean max 0.09), high 0.28 (defective min 0.43) → separable.
+
+Per face (25 frames): 9/9 clean scored → good, 14/14 defects scored → defective, 2 → uncertain
+(segmentation quality check: #20 pale gripper; one line defect on the brick edge where 11 % of the
+mask got trimmed → re-inspect, not a wrong verdict). ~1.0–1.5 s per face on the Mac CPU, almost all
+segmentation; the model is ~50 ms.
+Per brick: all-good brick → all faces checked; defect on face 2 of 4 → stop after 2 (early exit);
+doubtful face → re-shot, then `uncertain` (or `defective` with `uncertain_as="defective"`).
