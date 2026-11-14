@@ -32,7 +32,7 @@ def colour_mask(bgr, min_s=40, min_v=55):
     return m.astype(np.uint8)
 
 
-def _blob(mask, prefer_xy=None, drop_border=False, bridge=15):
+def _blob(mask, prefer_xy=None, drop_border=False, bridge=15, min_frac=0.01):
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     m = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k)
     # glare lines / stud edges split a brick into pieces: bridge small gaps before picking a blob
@@ -42,7 +42,7 @@ def _blob(mask, prefer_xy=None, drop_border=False, bridge=15):
     best, best_score = None, 0
     for i in range(1, n):
         x, y, bw, bh, area = st[i]
-        if area < 0.01 * h * w:
+        if area < min_frac * h * w:
             continue
         touches = (x == 0) + (y == 0) + (x + bw >= w) + (y + bh >= h)
         if drop_border and touches >= 1:
@@ -58,7 +58,8 @@ def _blob(mask, prefer_xy=None, drop_border=False, bridge=15):
     return best
 
 
-def _finish(bgr, mask, hull=True, fg=None, refine=None, keep_px=None, open_frac=None, hue_trim=None, glare=(60, 0)):
+def _finish(bgr, mask, hull=True, fg=None, refine=None, keep_px=None, open_frac=None, hue_trim=None, glare=(60, 0),
+            min_area=0.02):
     keep_px = 3 if keep_px is None else keep_px
     open_frac = open_frac or 0.0
     if mask is None or mask.sum() == 0:
@@ -113,7 +114,7 @@ def _finish(bgr, mask, hull=True, fg=None, refine=None, keep_px=None, open_frac=
             n, cc, st, _ = cv2.connectedComponentsWithStats(opened)
             mask = clean_mask((cc == 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))).astype(np.uint8))
     crop, crop_m, info = canonical_crop(bgr, mask, keep_px=keep_px)
-    info["ok"], info["reasons"] = mask_quality(mask)
+    info["ok"], info["reasons"] = mask_quality(mask, min_area=min_area)
     return mask, crop, crop_m, info
 
 
@@ -142,6 +143,20 @@ def side_colour_bg(bgr, background, diff_thr=25):
     m = colour_mask(bgr, min_s=30) & fg
     fg_wide = cv2.dilate(fg, np.ones((5, 5), np.uint8))
     return _finish(bgr, _blob(m), fg=fg_wide, **SIDE)
+
+
+def side_small(bgr, background, diff_thr=25):
+    """Side camera, brick SMALL in the frame (side faces: the arm holds the brick below the jaws,
+    ~70x55 px = ~0.5 % of a 640x480 frame). Same idea as side_colour_bg (coloured AND different from
+    the background) with size limits for a small brick. Pale bricks (lilac) are not found: almost the
+    colour of the white backdrop and jaws - left out of the side dataset on purpose."""
+    lab = lambda x: cv2.cvtColor(cv2.GaussianBlur(x, (5, 5), 0), cv2.COLOR_BGR2LAB).astype(np.float32)
+    d = np.linalg.norm(lab(bgr) - lab(background), axis=-1)
+    fg = (d > diff_thr).astype(np.uint8)
+    fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+    m = colour_mask(bgr, min_s=30) & fg
+    fg_wide = cv2.dilate(fg, np.ones((3, 3), np.uint8))
+    return _finish(bgr, _blob(m, bridge=7, min_frac=0.002), fg=fg_wide, min_area=0.002, **SIDE)
 
 
 def gripper_roi_clean(bgr, carry_frames, roi=GRIP_ROI, move_thr=1.0, **kw):

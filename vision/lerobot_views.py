@@ -40,7 +40,7 @@ import cv2
 import numpy as np
 import pandas as pd
 
-from colour_finders import gripper_roi_clean, side_colour_bg
+from colour_finders import gripper_roi_clean, side_colour_bg, side_small
 from segment import sheet
 
 H, W = 480, 640
@@ -58,6 +58,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--test-frac", type=float, default=0.25)
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--no-gripper", action="store_true")
+    p.add_argument("--side-finder", choices=["bg", "small"], default="bg",
+                   help="bg = brick close-up (top / bottom shown to the camera); small = brick small in the "
+                        "frame (side faces held below the jaws, e.g. 'show side 2' recordings)")
     return p.parse_args()
 
 
@@ -195,7 +198,8 @@ def main() -> None:
         side_res[epi] = []
         for k, img in frames:
             try:
-                mask, crop, crop_m, inf = side_colour_bg(img, background)
+                finder = side_small if args.side_finder == "small" else side_colour_bg
+                mask, crop, crop_m, inf = finder(img, background)
             except ValueError as ex:
                 mask = crop = crop_m = None
                 inf = {"ok": False, "reasons": [str(ex)]}

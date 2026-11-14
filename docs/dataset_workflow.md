@@ -206,6 +206,31 @@ uv run --with pyarrow python vision/lerobot_views.py --data <lerobot dataset fol
 - Runtime must cut the brick out the same way: the registry still names the older `bg` / `window`
   finders (`finders.py`) — switch them to `colour_finders` before using these models on the robot.
 
+### Side faces from LeRobot ("show side 2" recordings, 2026-11-14)
+
+Recording `sorting_robot(1)`: 150 episodes — 0–49 "pick up and show front side" (side camera sees top /
+bottom close up), 50–99 "show side 2" (the wrist flexes down, the brick hangs below the jaws: **side
+face**), 100–149 "move to the bowl" (no inspection). Only the side camera video is in that folder.
+
+```bash
+.venv/bin/python vision/lerobot_views.py --data '<...>/sorting_robot(1)' --out dataset/views/lerobot_side \
+    --faces dataset/lerobot_side_faces.csv --no-gripper --side-finder small
+.venv/bin/python vision/train_views.py --views dataset/views/lerobot_side --out results/models_side --cameras front --variants per_face
+```
+
+- Showing moment = the still segment with the wrist flexed ~90° (found automatically, 48/50).
+- `--side-finder small` (`colour_finders.side_small`): same colour + background-difference idea with
+  size limits for a small brick (~70×55 px, ~0.5 % of the frame; the default finder rejects < 1 %).
+- `dataset/lerobot_side_faces.csv`: 50–84 = side (red, yellow), everything else `none`. Lilac (85–99)
+  is excluded: too pale against the white backdrop / jaws (not found or the table got cut out).
+  No green brick in these recordings.
+- Result: `front_side` 72 train / 27 test crops, all clean (`qa.jpg`).
+- **Quality is not enough yet:** median crop 76 px (stretched ~3.4× to 256), the pose and angle
+  differ per episode (some show the bottom ring at an angle), ~24 distinct training episodes →
+  clean test bricks already score 0.58–1.00, synthetic marks AUROC 0.74, none caught at zero false
+  alarms. Re-record side faces in a **fixed pose, closer to the camera, square-on** (brick ≥ 200 px
+  wide, like the top / bottom close-ups), 20–30 per colour, plus real defective bricks.
+
 ## Checklist for a new dataset
 
 - [ ] backdrop + light fixed, exposure/WB locked (status bar fixed, meta auto_*=0), camera not moved
