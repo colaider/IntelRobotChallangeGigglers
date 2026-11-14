@@ -46,6 +46,12 @@ the laptop with OpenVINO (CPU / GPU / NPU).
 | 6 | Measure | `benchmark.py`, `sensitivity.py`, `synth_defects.py` | Latency per device; detection rate per defect size / marker colour / brick colour |
 | 7 | Decide | thresholds + `uncertain` band | Uncertain bricks are re-inspected → fewer wrong sorts |
 
+**Per brick, face by face (rule confirmed by the judges):** the first face that is confidently
+defective ends the inspection → defective bowl, remaining faces are skipped. An `uncertain` face is
+re-inspected before deciding (a false reject cannot be undone by later faces, so the "defective"
+threshold must be confident). A brick is good only when every face is confidently good. So only good
+bricks pay the full multi-face cycle time; check the faces most likely to carry a defect first.
+
 ## What is proven (MacBook CPU, our photos)
 
 | Finding | Evidence |
