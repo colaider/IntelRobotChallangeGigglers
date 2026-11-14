@@ -67,6 +67,8 @@ class Scorer:
         inf.device, inf.config, inf.model = r.device, None, r.compiled
         inf.input_blob, inf.output_blob = r.compiled.input(0), r.compiled.output(0)
         self.inf, self.device_used, self.compile_s, self.tried = inf, r.device, r.compile_s, r.tried
+        if device.upper() not in ("AUTO", r.device):
+            print(f"[openvino] {Path(xml).parent.parent.parent.name or Path(xml).name}: {device} not usable -> running on {r.device}")
         self.hw = input_hw(xml)
         self.roi = roi
         self.seg, self.seg_window, self.last_seg = seg, seg_window, None
@@ -90,7 +92,7 @@ class Scorer:
 
 def bench(xml: Path, device: str, test_set, runs: int, warmup: int) -> dict:
     t0 = time.perf_counter()
-    score = Scorer(xml, device)
+    score = Scorer(xml, device, fallback=False)  # measure exactly this device, never a silent fallback
     images = [cv2.cvtColor(cv2.imread(str(p)), cv2.COLOR_BGR2RGB) for p, _ in test_set]
     score(images[0])
     compile_s = time.perf_counter() - t0
