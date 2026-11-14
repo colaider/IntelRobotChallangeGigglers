@@ -1,4 +1,10 @@
-# Dataset layout (committed, shared with the team)
+# Dataset layout
+
+**Robot collection (current team format):** `data/<session>/` from `collection/run.py` (gitignored,
+shared as zip / drive) + face labels in `dataset/faces.csv` (committed) → `vision/build_views.py`
+→ `dataset/views/<view>/` (gitignored). Step by step: [`docs/dataset_workflow.md`](../docs/dataset_workflow.md).
+
+**Hand-held capture (older, still works):** the layout below.
 
 ```
 dataset/

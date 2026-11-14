@@ -251,3 +251,17 @@ every good test crop, paired = defect scores above the same frame without it, al
 Crops are cached in `results/experiments/cache/<camera>_<finder>/` (delete to recompute).
 Training here is plain torch on CPU (no Lightning, no export) for speed; benchmark the winner with
 `export.py` + `benchmark.py`.
+
+## 9. Robot sessions → per-view datasets (`build_views.py`)
+
+Data collected with `collection/run.py` (`data/<session>/`, all cameras + arm pose) plus face labels
+in `dataset/faces.csv` → one brick-only dataset per inspection view:
+
+```bash
+python vision/build_views.py          # -> dataset/views/{gripper_top,front_side,front_bottom,front_top}/
+python vision/train.py --root dataset/views/front_side
+```
+
+Full step-by-step (collect, label, share, build, train, calibrate, check):
+[`docs/dataset_workflow.md`](../docs/dataset_workflow.md).
+
