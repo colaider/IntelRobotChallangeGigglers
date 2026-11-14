@@ -107,3 +107,30 @@ allow the same number of false alarms on the 21 clean bricks. Sweep = synthetic 
 lower effective threshold (more false alarms). Keep `--augment` off by default (tool stays for
 later, e.g. if the station has more pose/light variation). The default threshold (0.5) sits right
 at the clean-score maximum (0.52) → tune the threshold / `uncertain` band on station data instead.
+
+## 2026-11-14 — brick ROI vs raw frames, with a fake gripper in the frame (MacBook, CPU)
+
+Data: e08b921 (30 `training/good`, 12 `test/good`, 12 `test/defective`; bricks lie on a white
+table at random positions/rotations and fill only ~15–25% of the frame).
+"Clutter" test set = the same 24 test images with grey/black "gripper fingers" drawn touching the
+brick from both sides, plus blue tape and dark dots on the table away from the brick.
+PatchCore, 3 seeds each, model's own threshold.
+
+| model | clean AUROC | clean false alarms | clean caught | clutter AUROC | clutter false alarms | clutter caught |
+|---|---|---|---|---|---|---|
+| raw frames | 0.896 / 0.917 / 0.896 | 3, 1, 3 of 12 | 10/12 | **0.50** (all 3 seeds) | **12/12** | 12/12 |
+| `--roi` | 0.979 / 0.986 / 0.986 | 1 of 12 | 11–12/12 | 0.986 / 0.979 / 0.972 | 1 of 12 | 10/12 |
+
+- **Raw frames break completely** once anything new appears next to the brick: every good brick is
+  "defective" (AUROC 0.5 = coin flip). This is exactly the gripper problem.
+- **ROI fixes it**: the gripper/table are greyed out per frame, the clean and clutter crops look
+  almost identical, and scores barely change.
+- **ROI also helps on clean frames** (AUROC ~0.90 → ~0.98, more defects caught): after cutting and
+  straightening, the brick fills the 256 px model input instead of ~50 px, so small dots survive.
+- The 2 defects missed under clutter are tiny dots on the brick edge with scores 0.485 / 0.496,
+  just under the 0.5 threshold - not caused by the gripper (same crops as clean). An `uncertain`
+  band around 0.5 with re-inspection would catch them.
+- Limits not tested here: gripper fingers that *cover* the inspected face, gripper of the same
+  colour as the brick, real shadows of the gripper on the brick.
+
+**Decision: use `--roi` for training and inference** (and `Scorer(..., roi=True)` in robot code).
