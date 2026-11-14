@@ -8,7 +8,7 @@ every command runs from the repo root. Why the steps look like this:
 ```
  collection/run.py  ──►  data/<session>/        raw frames of every camera + depth + arm pose
         │
- vision/sessions.py --sheet  ──►  dataset/faces.csv     which face the front camera sees (label by hand)
+ vision/sessions.py --add-missing / --sheet ──► dataset/faces.csv   face seen by each camera (label by hand)
         │
  vision/build_views.py  ──►  dataset/views/<camera>_<face>, <camera>_all     brick cut out; look at qa.jpg
         │
@@ -24,6 +24,55 @@ Cameras are never mixed. Per camera: `<camera>_top`, `<camera>_bottom`, `<camera
 face) and `<camera>_all` (one model for all faces) — cameras `gripper` and `front` (= RealSense `ground`).
 The brick's starting orientation is unknown, so any face can reach either camera: shoot and label
 every face for both cameras.
+
+---
+
+## Quick start: collecting the clean (static backdrop) dataset
+
+Team decision 2026-11-14. Collector with the **system Python** (`py`), everything else with the repo
+`.venv`. Details for each step below.
+
+**Camera settings**
+
+| camera | name | resolution | fps | depth | note |
+|---|---|---|---|---|---|
+| front RealSense D415 (inspection) | `ground` | 1920×1080 | 15 | off | brick is closer than the D415 depth range anyway |
+| gripper webcam | `gripper` | 1920×1080 (else 1280×720) | 30 | — | MJPEG (set automatically) |
+| top RealSense D415 (pick, VLA) | `top` | 640×480 | 30 | on | check with the VLA team before changing |
+
+```bash
+# 0. once: keep the old hall-background sessions out of the new dataset
+mkdir -p data_hall && mv data/2026* data_hall/
+
+# 1. which RealSense serial / USB index is which camera
+py collection/run.py --list
+
+# 2. camera + USB check, nothing saved (warnings: USB 2, fps far below asked, 1080p without MJPEG
+#    -> move a camera to another USB controller, lower fps, then resolution)
+py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> --no-robot \
+    --check-only --check-seconds 5 --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=640x480@30
+
+# 3. collect: one session per colour and label; press `a` once (fixed exposure); SPACE = capture
+py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> \
+    --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=640x480@30 --name red_good_a --label good
+#    per colour: <colour>_good_a, <colour>_good_b (test only), <colour>_defective_a (--label defective,
+#    then `d` + defect number in the window). Inspection poses only, every face with BOTH cameras.
+
+# 4. face labels: add rows, look at the sheets, fill `face` (front) and `gripper_face` (gripper)
+.venv/bin/python vision/sessions.py --add-missing
+.venv/bin/python vision/sessions.py --sheet ground gripper     # -> results/sessions/sheets/*.jpg
+
+# 5. datasets, all model variants, comparison
+.venv/bin/python vision/build_views.py        # then look at dataset/views/*/qa.jpg
+.venv/bin/python vision/train_views.py        # -> results/models/models.json + compare.md
+.venv/bin/python vision/train_face_classifier.py
+
+# 6. check
+.venv/bin/python vision/inspector_bank.py --camera front --mode per_face \
+    --folder data/<session> --pattern "*_ground_color.png"
+```
+
+Share: `data/` is gitignored — zip the new sessions / shared drive; commit `dataset/faces.csv`.
 
 ---
 
@@ -46,10 +95,10 @@ Full instructions: [`collection/README.md`](../collection/README.md). Must-dos:
 - **Defective sessions:** draw real marker defects (line, stroke, dot, tiny 1–2 mm dot, near the
   edge); label with `d` + defect number in the collector.
 - **Discard** (BACKSPACE): motion blur, fingers on the brick, brick cut by the frame, mid-move frames.
-- **Resolution:** collect at the resolution you will run at (default 640×480 everywhere). At
-  640×480 a brick is ~150–250 px wide → fine for ≥2 mm marks, borderline for 1 mm dots. If tiny
-  dots matter, try one session at 1280×720 for the front camera and compare before switching
-  (never mix resolutions in one model).
+- **Resolution:** per camera with `--cam` (table in the quick start). The front camera at 1080p gives
+  ~14 px per mm on the brick (vs ~5 at 640×480) → small dots survive the crop to 256 px; training
+  and inference time barely change (models see 256×256). Collect at the resolution you will run at
+  and never mix resolutions in one model's data. Run the camera check (`--check-only`) first.
 - **Depth:** saved correctly (16-bit, millimetres; it only *looks* black in an image viewer). The
   front camera is closer to the brick than the D415 minimum range (~30 cm), so there is **no depth
   on the brick** → not usable for the inspection mask there. Top camera depth is fine (pick).
