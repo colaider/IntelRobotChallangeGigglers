@@ -261,12 +261,13 @@ def canonical_crop(bgr: np.ndarray, mask: np.ndarray, margin: float = 0.08, fill
 
     def rotated(a):
         r = cv2.getRotationMatrix2D((cx, cy), a, 1.0)
-        return r, trim_outline(cv2.warpAffine(mask, r, (w, h), flags=cv2.INTER_NEAREST, borderValue=0))
+        m = trim_outline(cv2.warpAffine(mask, r, (w, h), flags=cv2.INTER_NEAREST, borderValue=0))
+        return (r, *box_constrain(m, rh))
 
-    rot, msk_r = rotated(angle)
-    if studs_at_bottom(msk_r):  # minAreaRect cannot tell up from down; put the studs on top
+    rot, msk_r, studs_down = rotated(angle)
+    if studs_down:  # minAreaRect cannot tell up from down; put the studs on top
         angle += 180
-        rot, msk_r = rotated(angle)
+        rot, msk_r, _ = rotated(angle)
     trimmed = 1 - msk_r.sum() / max(mask.sum(), 1)
     img_r = cv2.warpAffine(bgr, rot, (w, h), flags=cv2.INTER_LINEAR, borderValue=(fill,) * 3)
 
@@ -286,6 +287,39 @@ def canonical_crop(bgr: np.ndarray, mask: np.ndarray, margin: float = 0.08, fill
     info = {"angle": float(angle), "rect": (float(rw), float(rh)), "area_frac": float(mask.mean()),
             "trimmed": float(trimmed)}
     return canvas, canvas_m, info
+
+
+def box_constrain(mask_r: np.ndarray, short_side: float, stud_frac: float = 0.45,
+                  slack: float = 0.03) -> tuple[np.ndarray, bool]:
+    """Brick geometry on a mask rotated long-side-horizontal. Returns (mask, studs_at_bottom).
+
+    1. body = the box without protrusions: an opening wider than a stud removes studs and thin
+       glued-on bits (hand, gripper)
+    2. studs side = where the mask sticks out of the body, counted only over the central body
+       columns (bits at the corners or sides do not vote)
+    3. keep only what fits a brick: body + small slack on three sides, + up to stud height on
+       the studs side. Everything else (gripper / hand bits) is cut.
+    """
+    if mask_r.sum() == 0:
+        return mask_r, False
+    k = max(5, int(stud_frac * short_side)) | 1
+    body = cv2.morphologyEx(mask_r, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    pts = cv2.findNonZero(body)
+    if pts is None:
+        return mask_r, studs_at_bottom(mask_r)
+    bx, by, bw, bh = cv2.boundingRect(pts)
+    c0, c1 = bx + int(0.1 * bw), bx + bw - int(0.1 * bw)
+    above = int(mask_r[:by, c0:c1].sum())
+    below = int(mask_r[by + bh:, c0:c1].sum())
+    # no visible protrusion either way (studs merged into the body by the mask, or a face
+    # without studs): fall back to the edge-fill heuristic
+    studs_down = below > above if above != below else studs_at_bottom(mask_r)
+    sx, sy = int(slack * bw), int(slack * bh)
+    stud = int(stud_frac * bh) + sy
+    y0, y1 = (by - sy, by + bh + stud) if studs_down else (by - stud, by + bh + sy)
+    box = np.zeros_like(mask_r)
+    box[max(y0, 0):max(y1, 0), max(bx - sx, 0):bx + bw + sx] = 1
+    return (mask_r & box).astype(np.uint8), studs_down
 
 
 def _main_run(on: np.ndarray) -> np.ndarray:

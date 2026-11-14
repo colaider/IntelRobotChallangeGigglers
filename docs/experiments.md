@@ -261,7 +261,7 @@ colour, hull ∩ mask so edge marker strokes stay), body-only orientation (openi
 | **segment v2** | **1.00** | 0.00–0.15 | 0/10 | **15/15** |
 
 Both false alarms of v1 were glued-on gripper/hand bits (#2: 0.66, #20: 0.48), not the brick.
-v2: clean crops on 28/30 frames; #20 is flagged by the quality check (would be re-inspected);
+v2: clean crops on 28/30 frames (v3 below: 29/30); #20 is flagged by the quality check (would be re-inspected);
 #3 still comes out studs-down; #0 (blurred close-up) keeps only the face. ~0.7 s per 1920×1080
 frame on the Mac (CPU, not optimised).
 
@@ -276,3 +276,16 @@ frame on the Mac (CPU, not optimised).
 `predict.py --seg scene`, `Scorer(..., seg="scene")`); centre crop only works while the brick
 happens to be in the middle. Caveats as above: held-out frames come from the same sequences,
 synthetic defects only on red, one seed; needs Ivan's real `test/` frames.
+
+### segment.py v3 — brick geometry (29/30 clean)
+
+`box_constrain`: in the straightened mask, find the brick body (opening wider than a stud),
+decide the studs side by what sticks out over the central body columns (tie → old edge-fill rule),
+keep only body + stud height on that side; side bits of hand/gripper no longer tilt or flip the crop.
+Result on the 30 gripper frames: 29/30 clean, all studs up (fixed #1, #3, #16, #20); #20 still
+flagged by the quality check (9 % trimmed → would be re-inspected, crop itself is clean).
+Left: #0 is a blurred close-up where the studs are in shadow and the mask keeps only the face.
+Tried and dropped: colour region growing (did not recover the shadowed studs) and a sharpness
+check (blurred #0 = 9.6 vs sharp #3 = 10.1, not separable). Depth from the RealSense would fix #0
+(studs are geometry, not colour). Model metrics unchanged: AUROC 1.00, 0/10 false alarms, 15/15,
+also with bricks shifted ±300 px.

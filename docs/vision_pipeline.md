@@ -52,7 +52,7 @@ the laptop with OpenVINO (CPU / GPU / NPU).
 |---|---|
 | **Segmenting the brick is the biggest win** | Bricks in the gripper on a busy background: full frame AUROC 0.78 (a face in the background scored 1.00); segmented 1.00, 0 false alarms, 15/15 synthetic defects caught |
 | **Segmentation survives a moved brick, a fixed crop does not** | Bricks shifted 300 px: centre crop AUROC 0.58–0.69 (10/10 false alarms); segmented 1.00 |
-| Cutting off glued-on gripper bits matters | Raw segmentation: 2 false alarms, both caused by gripper bits; after the fix: 0 |
+| Cutting off glued-on gripper bits matters | Raw segmentation: 2 false alarms, both caused by gripper bits; after the fix: 0. Clean crops 24/30 → 29/30 |
 | Straight, tight crop catches smaller defects | Plain background (Alex): AUROC 0.89 → 1.00; tiny 1–2 mm dots 0.69 → 1.00 |
 | PatchCore is the best model here | PatchCore AUROC 0.83–0.94 vs PaDiM 0.79, STFPM 0.62 |
 | INT8 is free speed | 49 vs 55 ms on CPU, same AUROC; size barely changes (memory bank dominates) |
