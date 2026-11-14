@@ -1,21 +1,15 @@
-"""Capture inspection frames from a webcam into dataset/<split>/<class>/.
+"""Save full camera frames into dataset/raw/<split>/<class>/.
 
-The preview shows the full camera frame with a green box: only the area inside the box
-is saved. Put the brick so that it fills most of the box. The models resize every image
-to 256x256, so a square crop tight around the brick keeps the marker lines visible and
-avoids squashing a 16:9 frame.
-
-Files are named <YYYYmmdd_HHMMSS>_c<crop>_<NNN>.png (e.g. 20261114_101530_c700_000.png),
-so photos from different machines never collide in git and a mismatched crop is visible.
-
-SPACE saves a frame, Q (or ESC) quits.
+SPACE saves a PNG, Q (or ESC) quits. The green box previews a centre crop.
+Use preprocess.py to apply that crop to saved frames.
 
 Example:
     python vision/capture.py --split training --cls good --crop 700
 """
 
 import argparse
-import time
+from datetime import datetime
+from uuid import uuid4
 from pathlib import Path
 
 import cv2
@@ -29,8 +23,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--width", type=int, default=1920)
     p.add_argument("--height", type=int, default=1080)
     p.add_argument("--crop", type=int, default=-1,
-                   help="centre square crop size in px; -1 = largest centred square (default), 0 = full frame")
-    p.add_argument("--out", type=Path, default=Path("dataset"), help="dataset root")
+                   help="preview only: centre square size in px; -1 = largest square, 0 = full frame")
+    p.add_argument("--out", type=Path, default=Path("dataset/raw"), help="raw dataset root")
     return p.parse_args()
 
 
@@ -54,7 +48,7 @@ def main() -> None:
     if not cap.isOpened():
         raise SystemExit(f"Cannot open camera {args.camera}")
 
-    session = time.strftime("%Y%m%d_%H%M%S")
+    session = f"{datetime.now():%Y%m%d_%H%M%S}_{uuid4().hex[:8]}"
     saved = 0
     actual = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
     print(f"Camera {args.camera}: {actual[0]}x{actual[1]} (asked {args.width}x{args.height})")
@@ -75,9 +69,10 @@ def main() -> None:
 
         key = cv2.waitKey(1) & 0xFF
         if key == ord(" "):
-            tag = "full" if args.crop == 0 else f"c{x1 - x0}"
-            path = out_dir / f"{session}_{tag}_{saved:03d}.png"
-            cv2.imwrite(str(path), frame[y0:y1, x0:x1])
+            path = out_dir / f"{session}_{saved:03d}.png"
+            if not cv2.imwrite(str(path), frame):
+                print(f"Could not save {path}")
+                continue
             print(f"saved {path}")
             saved += 1
         elif key in (ord("q"), 27):
