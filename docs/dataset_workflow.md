@@ -180,6 +180,32 @@ res["decision"]    # good / defective / uncertain / incomplete (+ res["missing"]
 
 Write what you see into `docs/experiments.md`.
 
+## Extra source: LeRobot teleop recordings (`vision/lerobot_views.py`)
+
+The VLA demonstrations ("pick up the cube and show the front side to the side camera") already hold
+the brick still in front of the side camera. `lerobot_views.py` finds that moment from the joint
+states, decodes those frames (side + gripper, top camera unused) and cuts the brick out with
+`vision/colour_finders.py`. Training is still on photos; the video is only the source.
+
+```bash
+uv run --with pyarrow python vision/lerobot_views.py --data <lerobot dataset folder>   # ~2 min / 50 episodes, needs ffmpeg (AV1)
+.venv/bin/python vision/train_views.py --views dataset/views/lerobot
+```
+
+- Side camera (main): colour AND different from the empty scene (median of the frames before the
+  show over all episodes, `front_background.png`), shadow removed, hull filled only with
+  coloured / glare pixels, 3 px border. 50 recordings: 49 with a showing moment, 147/147 crops complete.
+- Gripper camera (quick screen): fixed window between the jaws, pixels that move while the brick is
+  carried dropped, only the brick's own hue kept (wood is saturated too), erosion+dilation, 1 px
+  border. 43/49 episodes clean; the rest rejected automatically (`skipped.txt`: too small / not convex).
+- Faces: `dataset/lerobot_faces.csv` (`episode,face,gripper_face`, top = studs, bottom = tube). The
+  side camera sees one of the two; the gripper camera always sees the opposite one. Written as a
+  template on the first run — check against `qa.jpg`.
+- Output `dataset/views/lerobot/{front,gripper}_{top,bottom,all}`, test split = whole episodes per
+  colour. Good frames only: thresholds come from synthetic defects until real defective frames exist.
+- Runtime must cut the brick out the same way: the registry still names the older `bg` / `window`
+  finders (`finders.py`) — switch them to `colour_finders` before using these models on the robot.
+
 ## Checklist for a new dataset
 
 - [ ] backdrop + light fixed, exposure/WB locked (status bar fixed, meta auto_*=0), camera not moved
