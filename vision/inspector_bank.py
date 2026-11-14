@@ -28,7 +28,6 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import openvino as ov
 
 from benchmark import Scorer
 from finders import make_finder
@@ -39,22 +38,37 @@ DEFAULT_REQUIRED = {"top": 1, "bottom": 1, "side": 4}
 
 class InspectorBank:
     def __init__(self, registry: Path | str, mode: str = "per_face", device: str = "AUTO",
-                 face_margin: float = 0.1, cls_min_prob: float = 0.8):
+                 face_margin: float = 0.1, cls_min_prob: float = 0.8,
+                 anomaly_device: str | None = None, classifier_device: str | None = None):
+        """device: default for every model; anomaly_device / classifier_device override it, e.g.
+        anomaly_device="NPU", classifier_device="GPU" (Anomalib on the NPU, classifier on the iGPU,
+        CPU free for the robot). Unsupported devices fall back (vision/ov_utils.py); the device each
+        model really runs on is in self.devices. Every model is compiled + run once here (warm-up),
+        so the first brick of the demo is not slow."""
+        from ov_utils import compile_with_fallback
         self.reg = json.loads(Path(registry).read_text())["cameras"]
         self.mode, self.device = mode, device
         self.face_margin, self.cls_min_prob = face_margin, cls_min_prob
         self._finders, self._scorers, self._cls = {}, {}, {}
-        core = ov.Core()
+        self.devices = {}
+        a_dev, c_dev = anomaly_device or device, classifier_device or device
         for cam, e in self.reg.items():
             bg = cv2.imread(e["background"]) if e.get("background") else None
             self._finders[cam] = make_finder(e["finder"], e["camera"], bg)
             for face, m in (e.get("per_face") or {}).items():
-                self._scorers[(cam, face)] = (Scorer(Path(m["xml"]), device), m)
+                sc = Scorer(Path(m["xml"]), a_dev)
+                self._scorers[(cam, face)] = (sc, m)
+                self.devices[f"{cam}/{face}"] = sc.device_used
             if e.get("single"):
-                self._scorers[(cam, "any")] = (Scorer(Path(e["single"]["xml"]), device), e["single"])
+                sc = Scorer(Path(e["single"]["xml"]), a_dev)
+                self._scorers[(cam, "any")] = (sc, e["single"])
+                self.devices[f"{cam}/all"] = sc.device_used
             if e.get("classifier"):
                 c = e["classifier"]
-                self._cls[cam] = (core.compile_model(c["xml"], device if device != "NPU" else "AUTO"), c)
+                r = compile_with_fallback(c["xml"], c_dev)
+                if r.compiled is not None:
+                    self._cls[cam] = (r.compiled, c)
+                    self.devices[f"{cam}/classifier"] = r.device
         missing = {"single": "single model", "per_face": "per-face models", "classifier": "classifier"}
         for cam in self.reg:
             have = {"single": (cam, "any") in self._scorers,
@@ -71,9 +85,13 @@ class InspectorBank:
     def _classify(self, cam: str, crop: np.ndarray) -> tuple[str, float]:
         model, c = self._cls[cam]
         s = c["size"]
-        rgb = cv2.cvtColor(cv2.resize(crop, (s, s), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
-        x = ((rgb.astype(np.float32) / 255 - np.array(c["mean"], np.float32)) / np.array(c["std"], np.float32))
-        logits = model(x.transpose(2, 0, 1)[None])[0][0]
+        small = cv2.resize(crop, (s, s), interpolation=cv2.INTER_AREA)
+        if c.get("ppp"):  # preprocessing is inside the model: feed the raw uint8 BGR crop
+            logits = model(small[None])[0][0]
+        else:
+            rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
+            x = ((rgb.astype(np.float32) / 255 - np.array(c["mean"], np.float32)) / np.array(c["std"], np.float32))
+            logits = model(x.transpose(2, 0, 1)[None])[0][0]
         p = np.exp(logits - logits.max())
         p /= p.sum()
         i = int(np.argmax(p))

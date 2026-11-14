@@ -50,14 +50,23 @@ class Scorer:
     """OpenVINO inferencer + the resize a static-shape model needs. Use this from robot code too."""
 
     def __init__(self, xml: Path, device: str = "AUTO", roi: bool = False, seg: str | None = None,
-                 seg_window=None):
+                 seg_window=None, fallback: bool = True):
         """seg="scene"|"paper": find + straighten + crop the brick first (model trained with --seg).
 
         After each call self.last_seg holds the segmentation info; last_seg["ok"] is False when
         the mask looks wrong -> robot code should treat the brick as 'uncertain' and re-inspect.
         roi=True: older plain-background cut-out (model trained with --roi).
         """
-        self.inf = OpenVINOInferencer(path=xml, device=device)
+        # compile with device fallback (NPU -> HETERO:NPU,CPU -> GPU -> CPU), model cache and the
+        # latency hint (vision/ov_utils.py), then hand the compiled model to Anomalib's inferencer
+        from ov_utils import compile_with_fallback
+        r = compile_with_fallback(xml, device, fallback=fallback)
+        if r.compiled is None:
+            raise RuntimeError(f"cannot compile {xml} on {device}: {r.tried}")
+        inf = OpenVINOInferencer.__new__(OpenVINOInferencer)
+        inf.device, inf.config, inf.model = r.device, None, r.compiled
+        inf.input_blob, inf.output_blob = r.compiled.input(0), r.compiled.output(0)
+        self.inf, self.device_used, self.compile_s, self.tried = inf, r.device, r.compile_s, r.tried
         self.hw = input_hw(xml)
         self.roi = roi
         self.seg, self.seg_window, self.last_seg = seg, seg_window, None

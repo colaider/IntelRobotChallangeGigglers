@@ -66,6 +66,20 @@ def load(root: Path, subs: list[str], classes: list[str]):
     return items
 
 
+def add_preprocessing(ovm):
+    """Move preprocessing into the OpenVINO graph (PrePostProcessor): the model takes the raw uint8 BGR
+    crop (NHWC, already resized to 224 - static shape for the NPU) and does BGR->RGB, float, /255,
+    ImageNet mean/std and NHWC->NCHW itself, on whatever device it runs on."""
+    from openvino.preprocess import ColorFormat, PrePostProcessor
+    ppp = PrePostProcessor(ovm)
+    ppp.input().tensor().set_element_type(ov.Type.u8).set_layout(ov.Layout("NHWC")) \
+        .set_color_format(ColorFormat.BGR).set_shape([1, SIZE, SIZE, 3])
+    ppp.input().model().set_layout(ov.Layout("NCHW"))
+    ppp.input().preprocess().convert_element_type(ov.Type.f32).convert_color(ColorFormat.RGB) \
+        .scale(255.0).mean((MEAN * 255 / 255).tolist()).scale(STD.tolist())
+    return ppp.build()
+
+
 def main() -> None:
     args = parse_args()
     torch.manual_seed(args.seed)
@@ -114,10 +128,11 @@ def main() -> None:
 
         out = args.out / f"{cam}_face_classifier"
         out.mkdir(parents=True, exist_ok=True)
-        ovm = ov.convert_model(model, example_input=torch.zeros(1, 3, SIZE, SIZE))
+        ovm = add_preprocessing(ov.convert_model(model, example_input=torch.zeros(1, 3, SIZE, SIZE)))
         xml = out / "model.xml"
         ov.save_model(ovm, str(xml), compress_to_fp16=True)
         meta = {"xml": str(xml), "classes": classes, "size": SIZE, "mean": MEAN.tolist(), "std": STD.tolist(),
+                "ppp": True, "input": "uint8 BGR NHWC [1, 224, 224, 3] (resize only outside the model)",
                 "test_accuracy": acc, "n_train": len(train)}
         (out / "classes.json").write_text(json.dumps(meta, indent=2))
         registry.setdefault("cameras", {}).setdefault(cam, {})["classifier"] = meta
