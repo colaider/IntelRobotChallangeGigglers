@@ -74,4 +74,13 @@ the laptop with OpenVINO (CPU / GPU / NPU).
 - Glossy plastic reflects room lights → diffuse light / hood at the inspection spot.
 - Numbers above come from small sets (10–20 test frames, partly synthetic defects) → re-check on
   the station with real defective bricks; measure GPU/NPU latency there.
-- On the station: use the arm's fixed inspection pose (`--window`) and RealSense depth for the mask.
+- Segmentation costs ~1 s per Full HD frame on CPU (not optimised): with 6 faces that is ~6 s per
+  brick, which counts toward cycle time → search window from the fixed pose, smaller working
+  resolution, depth mask, or segment on CPU while the model runs on NPU.
+- Colour-only segmentation limits (30 gripper frames): 29 clean; a pale-grey gripper next to a pale
+  lilac brick is only partly cut (frame flagged `uncertain`); studs in deep shadow on a blurred
+  close-up are lost.
+- On the station: use the arm's fixed inspection pose (`--window`) and RealSense depth for the mask
+  (fixes both cases above: brick, studs and gripper differ in depth, not in colour).
+- With `--seg`, run export / benchmark / synthetic defects on the segmented set (`dataset_seg`),
+  see `vision/README.md` §1b.

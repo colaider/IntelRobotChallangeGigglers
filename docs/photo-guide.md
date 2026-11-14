@@ -1,7 +1,14 @@
-# Photo guide: first test (one colour, one face)
+# Photo guide
 
-Goal: learn the tool (capture → train → heatmaps). These photos will be retaken later
-with the robot, so speed matters more than perfection, but the setup must stay fixed.
+Two setups so far: **(A) brick held in the gripper** in front of the inspection camera (current,
+`dataset/raw`, closest to the robot) and **(B) brick on a white sheet** (first test, archived in
+`dataset/archive/table_v1`). The rules below apply to both; setup-specific notes are marked.
+
+For (A): keep the camera fixed, present the brick at roughly the same distance, keep it in focus
+(blurred close-ups lose the studs), and if possible put a plain dark/grey board behind the
+inspection spot (people, lamps and a pale gripper next to a pale brick are the main error sources).
+
+The steps below describe (B), the original first test.
 
 ## You need
 
@@ -40,9 +47,8 @@ Draw the defects only after `training/good` and `test/good` are done.
 ## Then
 
 ```bash
-python vision/preprocess.py --crop 0
-python vision/train.py
-python vision/predict.py --ckpt results/Patchcore/bricks/v0/weights/lightning/model.ckpt --input dataset/processed/test --out results/predict
+python vision/train.py --seg scene        # (B) on paper: --seg paper
+python vision/predict.py --ckpt results/Patchcore/bricks/v0/weights/lightning/model.ckpt --input dataset/raw/test --seg scene --out results/predict
 ```
 
 Write down what you see (does the marker light up, do highlights/shadows?) in `docs/experiments.md`.

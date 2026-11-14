@@ -38,8 +38,8 @@ python vision/preprocess.py --crop 0        # dataset/raw -> dataset/processed (
 ```
 
 - `capture.py` saves the **full frame** to `dataset/raw/...`; the green box is only a preview.
-  Cropping happens later (`preprocess.py --crop N` centre square, or `train.py --roi`), so
-  raw frames can be re-cropped without reshooting.
+  Cropping happens later (`train.py --seg scene`, recommended, or `preprocess.py --crop N` centre
+  square), so raw frames can be re-cropped without reshooting.
 - `preprocess.py` refuses to overwrite: delete `dataset/processed` (or `vision/clear_data.sh`,
   which moves raw + processed to the macOS Trash) before re-running. `--median 3|5` exists but
   made no difference in our test (frames are downscaled to 256 px anyway).
@@ -59,9 +59,10 @@ python vision/segment.py --image <photo> --out results/one --mode scene      # e
 ```
 
 `vision/segment.py` (Alex, refined): find the brick → clean the mask → drop glued-on bits of
-hand/gripper (colour + outline trim) → rotate long side horizontal, **studs on top** → tight crop,
-flat grey background. Modes: `scene` = cluttered background / brick in the gripper (mean-shift +
-k-means + GrabCut, ~0.7 s per Full HD frame), `paper` = plain sheet (fast). `--window X0 Y0 X1 Y1`
+hand/gripper (colour refine, brick-geometry box, snap to the brick's side edges, stud-band filter)
+→ rotate long side horizontal, **studs on top** → tight crop, flat grey background. Modes: `scene` =
+cluttered background / brick in the gripper (mean-shift + k-means + GrabCut, ~1 s per Full HD
+frame on a laptop CPU, not optimised yet), `paper` = plain sheet (fast). `--window X0 Y0 X1 Y1`
 limits the search to where the arm presents the brick. A quality check (area, aspect, solidity,
 frame border, how much was trimmed) marks doubtful masks → treat as `uncertain` and re-inspect
 (`Scorer(..., seg="scene").last_seg["ok"]`). `brick_mask_depth` is ready for the RealSense.
@@ -69,6 +70,20 @@ Always look at `qa_crops.jpg` after segmenting a new dataset.
 
 Why: on Ivan's gripper frames the brick moves around the frame; a centre crop fails as soon as
 it is off-centre (AUROC 0.58), segmentation stays at 1.00 — see `docs/experiments.md`.
+On those 30 frames: 29 clean crops; #20 (pale gripper on a pale brick) is flagged `uncertain`,
+#0 (blurred close-up) loses the shadowed studs.
+
+**Working with segmented data in the other scripts:** segment once, then point them at the crops
+(they are already brick-only, so no `--seg` needed there):
+
+```bash
+python vision/segment.py --root dataset/raw --out dataset_seg --mode scene
+python vision/export.py --ckpt <ckpt> --root dataset_seg          # INT8 calibrates on segmented bricks
+python vision/benchmark.py --root dataset_seg --devices CPU GPU NPU
+python vision/synth_defects.py --input dataset_seg/test/good --out dataset_sweep --sweep 4 8 12 16 24 32
+```
+
+On the robot, `Scorer(xml, device, seg="scene")` segments each raw frame itself.
 
 ## 2. Train
 
@@ -79,12 +94,15 @@ python vision/train.py --model padim
 ```
 
 Prints test metrics (image AUROC, F1) and the checkpoint path under `results/`.
+If `test/defective` is still empty (new setup, only good photos so far), training still runs on
+Anomalib's synthetic anomalies and says so: those metrics and the threshold are indicative only.
 
 ## 3. Predict + heatmaps
 
 ```bash
 python vision/predict.py --ckpt results/Patchcore/bricks/v0/weights/lightning/model.ckpt \
-    --input dataset/processed/test/defective --out results/predict
+    --input dataset/raw/test/defective --seg scene --out results/predict   # model trained with --seg
+python vision/predict.py --ckpt ... --input dataset/processed/test/defective   # centre-crop model
 ```
 
 Prints score and label per image and writes `*_heat.png`. Heatmaps use a fixed scale:
@@ -101,7 +119,8 @@ python vision/train.py --root dataset_synth
 ```
 
 Draws marker-like lines, curves, dots, tiny 1–2 mm dots, scribbles and edge defects on the
-brick (found by colour saturation), with pixel masks in `test/masks/`. `dataset_synth/` is
+brick (found with segment.py's plain-background mask, so use it on segmented crops
+`dataset_seg/...` or on photos on paper, not on raw gripper frames), with pixel masks in `test/masks/`. `dataset_synth/` is
 gitignored. Never put synthetic images into `training/`.
 
 Inks: `black blue red green purple orange yellow tone` (`tone` = darker shade of the brick's

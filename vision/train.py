@@ -71,16 +71,28 @@ def main() -> None:
         n = make_augmented(args.root / args.normal_dir, aug_dir, args.augment, args.aug_flip, args.seed)
         print(f"Augmented training set: {n} images in {aug_dir}")
         normal_dir = aug_dir  # absolute path: Folder ignores root for it
+    def has_images(rel) -> bool:
+        d = Path(args.root) / rel
+        return d.is_dir() and any(p.suffix.lower() in (".png", ".jpg", ".jpeg", ".bmp") for p in d.iterdir())
+
+    split_kw = {"normal_test_dir": args.normal_test_dir, "abnormal_dir": args.abnormal_dir}
+    synthetic = not has_images(args.abnormal_dir)
+    if synthetic:
+        # no real defective photos yet (e.g. a new setup): let Anomalib make synthetic anomalies
+        # from held-out good images so training still runs; metrics/threshold are only indicative
+        print(f"\nNo images in {args.root / args.abnormal_dir}: using Anomalib's synthetic anomalies "
+              f"for validation/test. Threshold and metrics are NOT trustworthy - shoot real test/ photos.\n")
+        split_kw = {"normal_test_dir": args.normal_test_dir if has_images(args.normal_test_dir) else None,
+                    "abnormal_dir": None, "test_split_mode": "synthetic", "val_split_mode": "same_as_test"}
     dm = Folder(
         name=args.name,
         root=args.root,
         normal_dir=normal_dir,
-        normal_test_dir=args.normal_test_dir,
-        abnormal_dir=args.abnormal_dir,
         train_batch_size=args.batch_size,
         eval_batch_size=args.batch_size,
         num_workers=args.num_workers,
         seed=42,
+        **split_kw,
     )
     kwargs = {}
     if args.coreset_ratio is not None and args.model == "patchcore":
@@ -88,7 +100,7 @@ def main() -> None:
     model = MODELS[args.model](**kwargs)
     engine = Engine(default_root_dir=args.results, accelerator=args.accelerator)
     engine.fit(datamodule=dm, model=model)
-    print("\nTest metrics:")
+    print("\nTest metrics" + (" (SYNTHETIC anomalies, indicative only):" if synthetic else ":"))
     engine.test(datamodule=dm, model=model)
     print(f"\nCheckpoint: {engine.trainer.checkpoint_callback.best_model_path or 'see ' + str(args.results)}")
 
