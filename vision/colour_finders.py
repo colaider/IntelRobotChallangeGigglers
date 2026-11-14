@@ -174,7 +174,7 @@ def arm_window(fg, lower=0.45, pad=0.15):
     return x0, y0, x1, min(h, y + bh), (cx, y + 0.85 * bh)
 
 
-def side_small(bgr, background, diff_thr=25, close_px=0, fill_bright=False, open_frac=0.0):
+def side_small(bgr, background, diff_thr=25, close_px=0, fill_bright=False, open_frac=0.0, colour_needs_fg=False):
     """Side camera, brick SMALL in the frame (side faces: the arm holds the brick below the jaws,
     ~70x55 px = ~0.5 % of a 640x480 frame). Rule for every colour: 1) find the robot = the biggest
     region that differs from the empty scene, 2) look for the brick only at its lower end, 3) brick =
@@ -183,7 +183,10 @@ def side_small(bgr, background, diff_thr=25, close_px=0, fill_bright=False, open
     d = np.linalg.norm(lab(bgr) - lab(background), axis=-1)
     fg = (d > diff_thr).astype(np.uint8)
     fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
-    m = (colour_mask(bgr, min_s=30) | pale_mask(bgr)) & fg
+    colour = colour_mask(bgr, min_s=30) | pale_mask(bgr)
+    # the background difference finds the ROBOT; inside the window at its lower end a pixel with the
+    # brick's colour is brick even where the empty scene happens to look alike (pale brick vs grey paper)
+    m = colour & fg if colour_needs_fg else colour.copy()
     win = arm_window(fg)
     prefer = None
     if win is not None:
@@ -191,7 +194,11 @@ def side_small(bgr, background, diff_thr=25, close_px=0, fill_bright=False, open
         keep = np.zeros_like(m)
         keep[y0:y1, x0:x1] = 1
         m = m & keep
-    fg_wide = cv2.dilate(fg, np.ones((3, 3), np.uint8))
+    fg_wide = cv2.dilate(fg | (m if colour_needs_fg else colour & (m | 1)), np.ones((3, 3), np.uint8))
+    if win is not None and not colour_needs_fg:
+        x0, y0, x1, y1, _ = win
+        inwin = np.zeros_like(fg); inwin[y0:y1, x0:x1] = 1
+        fg_wide = cv2.dilate(fg | (colour & inwin), np.ones((3, 3), np.uint8))
     extra = None
     if fill_bright:  # inside the hull, any light pixel that differs from the empty scene is brick
         v = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)[..., 2]
