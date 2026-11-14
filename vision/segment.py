@@ -262,14 +262,16 @@ def canonical_crop(bgr: np.ndarray, mask: np.ndarray, margin: float = 0.08, fill
     def rotated(a):
         r = cv2.getRotationMatrix2D((cx, cy), a, 1.0)
         m = trim_outline(cv2.warpAffine(mask, r, (w, h), flags=cv2.INTER_NEAREST, borderValue=0))
-        return (r, *box_constrain(m, rh))
+        im = cv2.warpAffine(bgr, r, (w, h), flags=cv2.INTER_LINEAR, borderValue=(fill,) * 3)
+        return (r, *box_constrain(m, rh, img_r=im))
 
     rot, msk_r, studs_down = rotated(angle)
     if studs_down:  # minAreaRect cannot tell up from down; put the studs on top
         angle += 180
         rot, msk_r, _ = rotated(angle)
-    trimmed = 1 - msk_r.sum() / max(mask.sum(), 1)
     img_r = cv2.warpAffine(bgr, rot, (w, h), flags=cv2.INTER_LINEAR, borderValue=(fill,) * 3)
+    msk_r = snap_sides(img_r, msk_r)
+    trimmed = 1 - msk_r.sum() / max(mask.sum(), 1)
 
     keep = cv2.dilate(msk_r, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * keep_px + 1,) * 2))
     img_r[keep == 0] = fill
@@ -289,8 +291,49 @@ def canonical_crop(bgr: np.ndarray, mask: np.ndarray, margin: float = 0.08, fill
     return canvas, canvas_m, info
 
 
+def snap_sides(img_r: np.ndarray, mask_r: np.ndarray, search: float = 0.12, min_ratio: float = 1.8) -> np.ndarray:
+    """Cut a pale gripper / hand strip glued to the left or right side of a straightened brick.
+
+    Colour cannot always tell a pale brick from a pale-grey gripper, but the brick's side is a
+    straight vertical edge. For each side, look inside the outer `search` fraction of the mask
+    width for the column with the strongest horizontal colour gradient (Lab, summed over the
+    body rows); if it is clearly stronger than typical (min_ratio x median), cut beyond it.
+    """
+    pts = cv2.findNonZero(mask_r)
+    if pts is None:
+        return mask_r
+    x, y, bw, bh = cv2.boundingRect(pts)
+    lab = cv2.cvtColor(cv2.GaussianBlur(img_r, (5, 5), 0), cv2.COLOR_BGR2LAB).astype(np.float32)
+    gx = sum(np.abs(cv2.Sobel(lab[..., c], cv2.CV_32F, 1, 0, ksize=3)) for c in range(3))
+    rows = slice(y + int(0.25 * bh), y + bh - int(0.1 * bh))  # body rows (studs are on top)
+    prof = gx[rows, x:x + bw].sum(0)
+    if prof.size < 10:
+        return mask_r
+    med = float(np.median(prof)) + 1e-6
+    n = max(3, int(search * bw))
+
+    def inner_edge(p):
+        """Index of the strongest edge INSIDE the outer mask boundary (skip the boundary peak)."""
+        i = int(np.argmax(p[:max(4, n // 3)]))          # outer boundary peak
+        while i + 1 < n and p[i + 1] <= p[i]:           # walk down to the valley after it
+            i += 1
+        if i + 2 >= n:
+            return None
+        j = i + 1 + int(np.argmax(p[i + 1:n]))
+        return j if p[j] > min_ratio * med and p[j] > 1.3 * p[i] else None
+
+    out = mask_r.copy()
+    li = inner_edge(prof)
+    if li is not None:
+        out[:, :x + li] = 0
+    ri = inner_edge(prof[::-1])
+    if ri is not None:
+        out[:, x + bw - ri:] = 0
+    return out
+
+
 def box_constrain(mask_r: np.ndarray, short_side: float, stud_frac: float = 0.45,
-                  slack: float = 0.03) -> tuple[np.ndarray, bool]:
+                  slack: float = 0.015, img_r: np.ndarray | None = None) -> tuple[np.ndarray, bool]:
     """Brick geometry on a mask rotated long-side-horizontal. Returns (mask, studs_at_bottom).
 
     1. body = the box without protrusions: an opening wider than a stud removes studs and thin
@@ -319,7 +362,40 @@ def box_constrain(mask_r: np.ndarray, short_side: float, stud_frac: float = 0.45
     y0, y1 = (by - sy, by + bh + stud) if studs_down else (by - stud, by + bh + sy)
     box = np.zeros_like(mask_r)
     box[max(y0, 0):max(y1, 0), max(bx - sx, 0):bx + bw + sx] = 1
-    return (mask_r & box).astype(np.uint8), studs_down
+    out = (mask_r & box).astype(np.uint8)
+    # stud band: keep only stud-sized blobs; thin slivers of hand / gripper beside the studs go
+    band = np.zeros_like(out)
+    if studs_down:
+        band[by + bh + sy:] = out[by + bh + sy:]
+    else:
+        band[:max(by - sy, 0)] = out[:max(by - sy, 0)]
+    band_all = band.copy()  # everything in the stud band; only what passes the filters comes back
+    if band.any() and img_r is not None:
+        # studs have the brick's hue; a greenish gripper / pink skin sliver does not. Chroma only
+        # (a*, b*), so studs in shadow are kept.
+        lab = cv2.cvtColor(cv2.GaussianBlur(img_r, (5, 5), 0), cv2.COLOR_BGR2LAB).astype(np.float32)
+        bodypx = lab[by:by + bh, bx:bx + bw][mask_r[by:by + bh, bx:bx + bw] > 0]
+        if len(bodypx) > 50:
+            ref = np.median(bodypx, axis=0)
+            chroma = np.hypot(lab[..., 1] - ref[1], lab[..., 2] - ref[2])
+            spread = float(np.median(np.hypot(bodypx[:, 1] - ref[1], bodypx[:, 2] - ref[2])))
+            band = (band & (chroma < max(6.0, 4 * spread))).astype(np.uint8)
+    if band.any():
+        ks = max(3, int(0.12 * bh)) | 1
+        studs = cv2.morphologyEx(band, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ks, ks)))
+        n, cc, st, _ = cv2.connectedComponentsWithStats(studs)
+        keep = np.zeros_like(band)
+        if n > 1:
+            big = st[1:, cv2.CC_STAT_AREA].max()
+            for i in range(1, n):
+                if st[i, cv2.CC_STAT_AREA] >= 0.25 * big:
+                    keep[cc == i] = 1
+        # stud blobs survive the opening slightly shrunk: take the original band pixels near them
+        keep = cv2.dilate(keep, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ks, ks))) & band
+        out = ((out & (band_all == 0)) | keep).astype(np.uint8)
+    elif band_all.any():
+        out = (out & (band_all == 0)).astype(np.uint8)
+    return out, studs_down
 
 
 def _main_run(on: np.ndarray) -> np.ndarray:

@@ -289,3 +289,13 @@ Tried and dropped: colour region growing (did not recover the shadowed studs) an
 check (blurred #0 = 9.6 vs sharp #3 = 10.1, not separable). Depth from the RealSense would fix #0
 (studs are geometry, not colour). Model metrics unchanged: AUROC 1.00, 0/10 false alarms, 15/15,
 also with bricks shifted ±300 px.
+
+### segment.py v4 — pale gripper next to a pale brick (#20)
+
+#20 (pale lilac brick) had a strip of the light-grey gripper glued to its side: colour cannot
+separate them. Added `snap_sides` (cut at the brick's own straight side edge: strongest *inner*
+horizontal Lab gradient, skipping the mask boundary), a chroma filter in the stud band (keeps
+studs in shadow, drops greenish/skin slivers) and smaller side slack (1.5 %). Left strip gone,
+right wedge smaller but not gone; #20 stays flagged `uncertain` (11 % trimmed). Other 29 crops
+unchanged. Tried and dropped: a strict colour core as the body box (shading broke it → studs cut
+on 12/30 frames). Metrics unchanged: AUROC 1.00, 0/10 false alarms, 15/15, also shifted.
