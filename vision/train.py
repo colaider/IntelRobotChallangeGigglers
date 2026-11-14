@@ -5,7 +5,7 @@ Training uses dataset/training/good only; dataset/test/{good,defective} are for 
 Example:
     python vision/train.py --model patchcore
     python vision/train.py --augment 3          # + 3 realistic variations per good image
-    python vision/train.py --roi                # brick-only aligned crops (gripper/table ignored)
+    python vision/train.py --seg scene          # find + straighten + crop the brick (recommended)
 """
 
 import argparse
@@ -18,6 +18,7 @@ from lightning.pytorch import seed_everything
 
 from augment import make_augmented
 from roi import align_tree
+from segment import segment_tree
 
 MODELS = {"patchcore": Patchcore, "padim": Padim, "stfpm": Stfpm}
 
@@ -38,7 +39,12 @@ def parse_args() -> argparse.Namespace:
                    help="add N realistic variations per good image (rotation/shift/light, no colour change)")
     p.add_argument("--aug-flip", action="store_true", help="allow horizontal flips in --augment")
     p.add_argument("--roi", action="store_true",
-                   help="cut out + straighten the brick and grey out gripper/background first (vision/roi.py)")
+                   help="older plain-background cut-out (vision/roi.py); prefer --seg")
+    p.add_argument("--seg", choices=["scene", "paper"], default=None,
+                   help="find + straighten + crop the brick first (vision/segment.py): scene = cluttered "
+                        "background / brick in the gripper, paper = plain sheet. Reads dataset/raw by default")
+    p.add_argument("--seg-window", type=float, nargs=4, default=None, metavar=("X0", "Y0", "X1", "Y1"),
+                   help="--seg scene: search only in this part of the frame (fractions)")
     p.add_argument("--seed", type=int, default=42, help="fixes PatchCore coreset sampling for fair comparisons")
     p.add_argument("--coreset-ratio", type=float, default=None,
                    help="PatchCore memory-bank fraction (default 0.1). With --augment N use 0.1/(N+1) "
@@ -49,7 +55,13 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     seed_everything(args.seed, workers=True)
-    if args.roi:
+    if args.seg:
+        src = Path("dataset/raw") if args.root == Path("dataset/processed") else args.root
+        seg_root = (args.results / "seg_dataset").resolve()
+        print(f"Segmenting {src} -> {seg_root} ({args.seg} mode)")
+        segment_tree(src, seg_root, args.seg, window=args.seg_window, verbose=False)
+        args.root = seg_root  # train and test on straightened brick-only crops
+    elif args.roi:
         roi_root = (args.results / "roi_dataset").resolve()
         align_tree(args.root, roi_root)
         args.root = roi_root  # train and test on aligned, background-free brick crops

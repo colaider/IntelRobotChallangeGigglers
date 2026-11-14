@@ -68,7 +68,14 @@ def parse_args() -> argparse.Namespace:
 
 
 def brick_mask(img: np.ndarray, sat_thresh: int) -> np.ndarray:
-    """Coloured brick on a low-saturation background; falls back to the central 60%."""
+    """Brick mask from segment.py (Lab colour distance + morphology; also finds pale lilac).
+
+    Falls back to HSV saturation, then to the central 60%, if that finds nothing.
+    """
+    from segment import brick_mask_rgb, clean_mask
+    mask = clean_mask(brick_mask_rgb(img))
+    if mask.sum() >= 0.02 * mask.size:
+        return mask
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     mask = (hsv[..., 1] > sat_thresh).astype(np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((7, 7), np.uint8))

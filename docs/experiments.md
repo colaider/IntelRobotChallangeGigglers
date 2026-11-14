@@ -163,3 +163,116 @@ PatchCore, seed 1.
   Retrain per camera/background setup.
 - Caveats: 10 test frames from the same sequences as training (optimistic), synthetic defects only on red,
   one seed. Need Ivan's real `test/good` + `test/defective` in this setup to confirm.
+## 2026-11-14 — segmentation + canonical crop (Windows laptop, CPU only)
+
+Data: commit e08b921 (30 `training/good`, 12 `test/good`, 12 `test/defective`, 3 colours).
+PatchCore defaults (wide_resnet50_2, layer2+3, 256×256), seed 42, Anomalib 2.7.0.
+
+New step `vision/segment.py`: brick mask from Lab colour distance to the paper → morphology
+(open, close, largest component, fill holes) → `minAreaRect` → rotate long side horizontal,
+studs on top → tight crop + 8 % margin, background flat grey.
+
+Two problems found in the raw photos before training:
+- The brick covers only 5–26 % of the frame, and `test/defective` bricks were shot much closer
+  (crop up to 552 px vs ~230–350 px in training): the raw model can score "bigger brick"
+  instead of the defect.
+- After straightening, all 30 training bricks had studs up and all 12 defective studs down
+  (same face, turned 180° in the photo). Fixed by `studs_at_bottom()`: the stud side of the
+  silhouette is less filled.
+- The old HSV-saturation brick mask finds nothing on lilac (falls back to the image centre);
+  `synth_defects.py` now uses the new mask.
+
+### Results (same photos, same model, only the pre-processing differs)
+
+| data | AUROC (all test) | defective above highest good | max good | min defective |
+|---|---|---|---|---|
+| raw 700×700 | 0.889 | 4/12 | 0.725 | 0.379 |
+| **segmented** | **1.000** | **12/12** | 0.395 | 0.463 |
+
+Synthetic defects (72 on `test/good`, 6 per image, seed 0), AUROC per kind vs the 12 good:
+
+| kind | raw | segmented |
+|---|---|---|
+| tiny (1–2 mm) | 0.685 | **1.000** |
+| edge | 0.798 | **0.988** |
+| dot | 0.946 | 1.000 |
+| line | 0.951 | 1.000 |
+| curve | 0.981 | 1.000 |
+| scribble | 1.000 | 1.000 |
+| all | 0.899 | **0.998** (71/72 above every good) |
+
+Heatmaps: with segmentation the hot spot sits exactly on the marker dot/line; on raw photos the
+whole brick glows and dots are weak.
+
+### Caveats / next
+
+- Tiny test set (12 + 12): AUROC 1.0 here means "separable", not "perfect".
+- The threshold is still wrong: Anomalib's adaptive 0.5 (fit on half of `test/`) labels 3 real
+  defects good (scores 0.46–0.50) although every defective scores above every good. Re-tune
+  the threshold on a bigger `test/` before the run (the gap here was 0.395 → 0.463).
+- Remaining warm areas on good bricks: the studs (perspective changes) and the ragged lilac mask
+  edge. Options: more training poses, mask the anomaly map with an eroded brick mask, depth mask
+  from the RealSense for cleaner outlines.
+- `test/defective` #011 is a different face (2×2 top view) that is never in training.
+- Reproduce: `python vision/segment.py --root dataset --out dataset_seg`, then
+  `python vision/train.py --root dataset_seg`.
+
+## 2026-11-14 — brick held in the gripper, cluttered background (`vision/good/good`, 30 good)
+
+1920×1080 photos of yellow, red and white bricks held in the gripper; background = wooden table,
+cables, hands, people, blue LED strips. No paper, so the paper-colour mask picks the **table** in
+23/30 photos.
+
+New `segment.py --mode scene`: mean-shift flattening → k-means (8 colours, Lab) → pick the region
+that is big × convex × central, smooth, not touching the border → GrabCut refine → strong opening
+(cuts glued-on bits of hand/gripper) → same morphology + canonical crop as before.
+Brick found in 30/30; clean crop in 28/30 (#003, #013 came out studs-down because of stray bits;
+#000 is a close-up where only the face is kept). ~0.9 s per 1920×1080 photo on a Ryzen 7 CPU.
+
+| model | data | result |
+|---|---|---|
+| trained on paper photos (`dataset_seg`) | these 30 good crops | 16/30 good flagged defective: new camera, light, white colour → must retrain per setup |
+| trained on 20 of these crops | 10 held-out good + 60 synthetic defects | AUROC 0.848 (0.875 without the 2 bad crops) |
+
+Synthetic AUROC by kind (without the 2 bad crops): scribble 1.00, dot/line/curve 0.97, edge 0.74,
+tiny 0.60.
+
+Heatmaps: defects light up exactly where they are, but good bricks also light up on
+**reflections of the room LED strips** on the glossy surface, which move with every pose.
+
+Next for this setup: shield the inspection spot from room light (diffuse light box / hood around
+camera + brick), fixed presentation pose, 50+ good photos per colour, real defective bricks,
+RealSense depth for the mask (brick and gripper are the nearest objects).
+
+## 2026-11-14 — segment.py v2 (artefact fixes) on Ivan's gripper frames (MacBook CPU)
+
+Same split as the gripper experiment above (20 train / 10 held-out good of `dataset/raw`,
+15 synthetic black marks on the 5 red held-out frames), PatchCore seed 1, FP16 OpenVINO.
+
+Fixes on top of Alex's `--mode scene`: colour refine (drop mask pixels far from the brick core
+colour, hull ∩ mask so edge marker strokes stay), body-only orientation (opening before
+`minAreaRect`), `trim_outline` (cut thin columns/rows sticking out of the straightened box),
+`mask_quality` (area, aspect, solidity, border, >8 % trimmed → `uncertain`), optional search window.
+
+| input | AUROC | clean scores | false alarms @0.5 | caught at 0 false alarms |
+|---|---|---|---|---|
+| centre 700 crop | 1.00 | 0.00–0.17 | 0/10 | 15/15 |
+| segment v1 (Alex, as is) | 0.95 | 0.00–0.66 | 1/10 | 9/15 |
+| **segment v2** | **1.00** | 0.00–0.15 | 0/10 | **15/15** |
+
+Both false alarms of v1 were glued-on gripper/hand bits (#2: 0.66, #20: 0.48), not the brick.
+v2: clean crops on 28/30 frames; #20 is flagged by the quality check (would be re-inspected);
+#3 still comes out studs-down; #0 (blurred close-up) keeps only the face. ~0.7 s per 1920×1080
+frame on the Mac (CPU, not optimised).
+
+**Shifted bricks** (test frames translated, models unchanged — "robustness to new positions"):
+
+| shift | centre 700 AUROC / false alarms | segment v2 AUROC / false alarms |
+|---|---|---|
+| +300 px right | 0.69 / 0 (6/15 caught) | **1.00 / 0** (15/15) |
+| −250, −150 px | 0.58 / **10/10** | **1.00 / 0** (15/15) |
+
+**Decision: `--seg scene` for training and inference** (`train.py --seg scene`,
+`predict.py --seg scene`, `Scorer(..., seg="scene")`); centre crop only works while the brick
+happens to be in the middle. Caveats as above: held-out frames come from the same sequences,
+synthetic defects only on red, one seed; needs Ivan's real `test/` frames.

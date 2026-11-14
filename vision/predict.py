@@ -23,7 +23,26 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--accelerator", default="cpu")
     p.add_argument("--out", type=Path, default=Path("results/predict"))
     p.add_argument("--roi", action="store_true", help="align bricks first (model trained with --roi)")
+    p.add_argument("--seg", choices=["scene", "paper"], default=None,
+                   help="segment bricks first (model trained with the same --seg)")
     return p.parse_args()
+
+
+def segment_input(src: Path, dst: Path, mode: str) -> Path:
+    """Segment one image or a folder of raw frames into dst; prints frames that would be 'uncertain'."""
+    from segment import IMAGE_EXT, process
+    files = [src] if src.is_file() else sorted(p for p in src.rglob("*") if p.suffix.lower() in IMAGE_EXT)
+    dst.mkdir(parents=True, exist_ok=True)
+    for p in files:
+        try:
+            _, crop, _, info = process(cv2.imread(str(p)), mode=mode)
+        except ValueError:
+            print(f"{p.name}: no brick found -> uncertain")
+            continue
+        if not info["ok"]:
+            print(f"{p.name}: segmentation doubtful ({', '.join(info['reasons'])}) -> uncertain")
+        cv2.imwrite(str(dst / f"{p.stem}.png"), crop)
+    return dst
 
 
 def overlay(image_path: Path, anomaly_map, out_path: Path) -> None:
@@ -44,7 +63,9 @@ def main() -> None:
     args = parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     data = args.input
-    if args.roi:
+    if args.seg:
+        data = segment_input(args.input, args.out / "seg_input", args.seg)
+    elif args.roi:
         from roi import align_tree
         data = args.out / "roi_input"
         align_tree(args.input, data)

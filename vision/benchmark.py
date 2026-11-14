@@ -49,14 +49,26 @@ def input_hw(xml: Path) -> tuple[int, int] | None:
 class Scorer:
     """OpenVINO inferencer + the resize a static-shape model needs. Use this from robot code too."""
 
-    def __init__(self, xml: Path, device: str = "AUTO", roi: bool = False):
-        """roi=True: cut out + straighten the brick first (model must be trained with --roi)."""
+    def __init__(self, xml: Path, device: str = "AUTO", roi: bool = False, seg: str | None = None,
+                 seg_window=None):
+        """seg="scene"|"paper": find + straighten + crop the brick first (model trained with --seg).
+
+        After each call self.last_seg holds the segmentation info; last_seg["ok"] is False when
+        the mask looks wrong -> robot code should treat the brick as 'uncertain' and re-inspect.
+        roi=True: older plain-background cut-out (model trained with --roi).
+        """
         self.inf = OpenVINOInferencer(path=xml, device=device)
         self.hw = input_hw(xml)
         self.roi = roi
+        self.seg, self.seg_window, self.last_seg = seg, seg_window, None
 
     def __call__(self, rgb: np.ndarray):
-        if self.roi:
+        if self.seg:
+            from segment import process
+            _, crop, _, self.last_seg = process(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), mode=self.seg,
+                                                window=self.seg_window)  # ValueError if no brick
+            rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+        elif self.roi:
             from roi import align
             crop, _ = align(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), size=self.hw[0] if self.hw else 256)
             if crop is None:

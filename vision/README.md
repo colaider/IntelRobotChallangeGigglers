@@ -49,10 +49,32 @@ python vision/preprocess.py --crop 0        # dataset/raw -> dataset/processed (
 - Aim for 20–30 in `training/good` and at least 10 each in `test/good` and `test/defective`
   (half of `test/` is used to pick the threshold).
 
+## 1b. Segment: find, straighten and crop the brick (recommended)
+
+```bash
+python vision/train.py --seg scene                 # segments dataset/raw on the fly, then trains
+python vision/predict.py --ckpt ... --input <raw frames> --seg scene
+python vision/segment.py --root dataset/raw --out dataset_seg --mode scene   # just segment + QA sheets
+python vision/segment.py --image <photo> --out results/one --mode scene      # every stage of one photo
+```
+
+`vision/segment.py` (Alex, refined): find the brick → clean the mask → drop glued-on bits of
+hand/gripper (colour + outline trim) → rotate long side horizontal, **studs on top** → tight crop,
+flat grey background. Modes: `scene` = cluttered background / brick in the gripper (mean-shift +
+k-means + GrabCut, ~0.7 s per Full HD frame), `paper` = plain sheet (fast). `--window X0 Y0 X1 Y1`
+limits the search to where the arm presents the brick. A quality check (area, aspect, solidity,
+frame border, how much was trimmed) marks doubtful masks → treat as `uncertain` and re-inspect
+(`Scorer(..., seg="scene").last_seg["ok"]`). `brick_mask_depth` is ready for the RealSense.
+Always look at `qa_crops.jpg` after segmenting a new dataset.
+
+Why: on Ivan's gripper frames the brick moves around the frame; a centre crop fails as soon as
+it is off-centre (AUROC 0.58), segmentation stays at 1.00 — see `docs/experiments.md`.
+
 ## 2. Train
 
 ```bash
-python vision/train.py                    # PatchCore on dataset/processed
+python vision/train.py                    # PatchCore on dataset/processed (centre crop)
+python vision/train.py --seg scene        # on segmented bricks from dataset/raw (recommended)
 python vision/train.py --model padim
 ```
 
@@ -107,7 +129,7 @@ python vision/train.py --augment 3 --aug-flip # also mirror (symmetric faces onl
 Small rotation/shift/scale and brightness/contrast only — never colour changes, which would
 make a coloured marker look "normal". `--seed` (default 42) makes runs comparable.
 
-## 4c. Brick ROI (optional)
+## 4c. Brick ROI (older, plain background only — prefer `--seg`)
 
 ```bash
 python vision/train.py --roi                       # train/test on aligned brick-only crops
