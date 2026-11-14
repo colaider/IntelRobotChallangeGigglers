@@ -96,7 +96,7 @@ def brick_mask_scene(bgr: np.ndarray, k: int = 8, work: int = 320, refine_px: in
 
     # GrabCut at a medium resolution: seed = region (probable fg), its core (sure fg),
     # a ring around it (probable bg), everything else sure background
-    r_s = refine_px / max(h, w)
+    r_s = min(1.0, refine_px / max(h, w))  # never upscale (640x480 stays as is)
     mid = cv2.resize(bgr, (int(w * r_s), int(h * r_s)), interpolation=cv2.INTER_AREA)
     mh, mw = mid.shape[:2]
     comp = cv2.resize(best, (mw, mh), interpolation=cv2.INTER_NEAREST)

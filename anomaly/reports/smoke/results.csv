@@ -1,0 +1,4 @@
+image,label,score,ms
+data\20261114_120510_red_good_a\0003_ground_color.png,good,0.0,132.8
+data\20261114_120510_red_good_a\0013_ground_color.png,no_brick,,15.2
+data\20261114_122305_light_yellow_good_a\0005_ground_color.png,good,0.0,161.9

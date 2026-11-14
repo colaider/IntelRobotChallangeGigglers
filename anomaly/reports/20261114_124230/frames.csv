@@ -1,0 +1,102 @@
+frame,colour,split,result,score,ms
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0001_ground_color.png,light_green,test/good,defective,0.5203,125.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0002_ground_color.png,light_green,training/good,good,0.0,124.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0003_ground_color.png,light_green,training/good,good,0.0,125.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0004_ground_color.png,light_green,test/good,defective,0.5068,120.5
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0005_ground_color.png,light_green,training/good,good,0.0,149.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0006_ground_color.png,light_green,training/good,good,0.0,175.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0007_ground_color.png,light_green,training/good,good,0.0,129.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0008_ground_color.png,light_green,training/good,good,0.0,145.3
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0009_ground_color.png,light_green,training/good,good,0.0,126.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0010_ground_color.png,light_green,training/good,good,0.0,123.9
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0011_ground_color.png,light_green,training/good,good,0.0,127.9
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0012_ground_color.png,light_green,skipped (no brick),no_brick,,10.1
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0013_ground_color.png,light_green,skipped (no brick),no_brick,,11.4
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0014_ground_color.png,light_green,skipped (no brick),no_brick,,10.2
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0015_ground_color.png,light_green,skipped (no brick),no_brick,,10.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0016_ground_color.png,light_green,skipped (no brick),no_brick,,10.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0017_ground_color.png,light_green,skipped (no brick),no_brick,,10.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0018_ground_color.png,light_green,training/good,good,0.0,135.9
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0019_ground_color.png,light_green,training/good,good,0.0,120.1
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0020_ground_color.png,light_green,training/good,good,0.0,123.2
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0021_ground_color.png,light_green,training/good,good,0.0,122.5
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0022_ground_color.png,light_green,training/good,good,0.0,120.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0023_ground_color.png,light_green,training/good,good,0.0,123.4
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0024_ground_color.png,light_green,training/good,good,0.0,118.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121800_light_green_good_a\0025_ground_color.png,light_green,training/good,good,0.0,136.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0001_ground_color.png,light_purple,training/good,good,0.0,133.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0002_ground_color.png,light_purple,training/good,good,0.0,123.3
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0003_ground_color.png,light_purple,training/good,good,0.0,127.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0004_ground_color.png,light_purple,test/good,defective,0.6794,127.4
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0005_ground_color.png,light_purple,training/good,good,0.0,123.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0006_ground_color.png,light_purple,training/good,good,0.0,123.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0007_ground_color.png,light_purple,training/good,good,0.0,124.3
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0008_ground_color.png,light_purple,training/good,good,0.0,125.5
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0009_ground_color.png,light_purple,training/good,good,0.0,127.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0010_ground_color.png,light_purple,test/good,defective,1.0,127.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0011_ground_color.png,light_purple,training/good,good,0.0,121.1
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0012_ground_color.png,light_purple,training/good,good,0.0,130.1
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0013_ground_color.png,light_purple,training/good,good,0.0,130.2
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0014_ground_color.png,light_purple,skipped (no brick),no_brick,,12.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0015_ground_color.png,light_purple,skipped (no brick),no_brick,,12.5
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0016_ground_color.png,light_purple,skipped (no brick),no_brick,,12.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0017_ground_color.png,light_purple,skipped (no brick),no_brick,,12.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0018_ground_color.png,light_purple,training/good,good,0.0,141.9
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0019_ground_color.png,light_purple,training/good,good,0.0,122.4
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0020_ground_color.png,light_purple,training/good,good,0.0,132.1
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0021_ground_color.png,light_purple,test/good,defective,0.928,133.4
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0022_ground_color.png,light_purple,training/good,good,0.0,119.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0023_ground_color.png,light_purple,training/good,good,0.0,124.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0024_ground_color.png,light_purple,training/good,good,0.0,117.3
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_121312_light_purple_good_a\0025_ground_color.png,light_purple,training/good,good,0.0,123.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0001_ground_color.png,light_yellow,training/good,good,0.0,133.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0002_ground_color.png,light_yellow,training/good,good,0.0,127.5
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0003_ground_color.png,light_yellow,training/good,good,0.0,121.1
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0004_ground_color.png,light_yellow,training/good,good,0.0,117.3
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0005_ground_color.png,light_yellow,training/good,good,0.0,121.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0006_ground_color.png,light_yellow,training/good,good,0.0,123.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0007_ground_color.png,light_yellow,training/good,good,0.0,121.4
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0008_ground_color.png,light_yellow,training/good,good,0.0,124.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0009_ground_color.png,light_yellow,test/good,defective,0.6993,133.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0010_ground_color.png,light_yellow,training/good,defective,0.625,130.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0011_ground_color.png,light_yellow,training/good,good,0.0,129.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0012_ground_color.png,light_yellow,training/good,good,0.0,135.9
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0013_ground_color.png,light_yellow,skipped (no brick),no_brick,,12.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0014_ground_color.png,light_yellow,skipped (no brick),no_brick,,12.1
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0015_ground_color.png,light_yellow,skipped (no brick),no_brick,,12.1
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0016_ground_color.png,light_yellow,skipped (no brick),no_brick,,14.1
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0017_ground_color.png,light_yellow,skipped (no brick),no_brick,,11.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0018_ground_color.png,light_yellow,skipped (no brick),no_brick,,12.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0019_ground_color.png,light_yellow,skipped (no brick),no_brick,,11.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0020_ground_color.png,light_yellow,skipped (no brick),no_brick,,11.5
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0021_ground_color.png,light_yellow,training/good,good,0.0,128.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0022_ground_color.png,light_yellow,test/good,defective,0.8874,148.3
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0023_ground_color.png,light_yellow,training/good,good,0.0,143.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0024_ground_color.png,light_yellow,training/good,good,0.0,137.9
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0025_ground_color.png,light_yellow,training/good,good,0.0,141.4
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_122305_light_yellow_good_a\0026_ground_color.png,light_yellow,training/good,good,0.0,129.6
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0001_ground_color.png,red,training/good,good,0.0,124.4
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0002_ground_color.png,red,training/good,good,0.0639,122.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0003_ground_color.png,red,training/good,good,0.0,132.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0004_ground_color.png,red,training/good,good,0.0,134.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0005_ground_color.png,red,training/good,good,0.0,125.9
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0006_ground_color.png,red,training/good,good,0.0,123.5
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0007_ground_color.png,red,training/good,good,0.0,121.8
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0008_ground_color.png,red,training/good,good,0.0,120.2
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0009_ground_color.png,red,training/good,good,0.0,122.9
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0010_ground_color.png,red,skipped (no brick),no_brick,,14.2
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0011_ground_color.png,red,training/good,good,0.0,131.9
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0012_ground_color.png,red,skipped (no brick),no_brick,,12.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0013_ground_color.png,red,skipped (no brick),no_brick,,11.5
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0014_ground_color.png,red,skipped (no brick),no_brick,,12.2
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0015_ground_color.png,red,test/good,defective,0.8056,130.3
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0016_ground_color.png,red,training/good,good,0.0,121.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0017_ground_color.png,red,training/good,good,0.0,119.1
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0018_ground_color.png,red,training/good,good,0.0,126.4
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0019_ground_color.png,red,training/good,good,0.0,125.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0020_ground_color.png,red,training/good,good,0.0,125.2
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0021_ground_color.png,red,training/good,good,0.0,137.9
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0022_ground_color.png,red,training/good,good,0.0,134.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0023_ground_color.png,red,training/good,good,0.0,121.7
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0024_ground_color.png,red,test/good,defective,0.9027,166.0
+C:\Users\penturas\Desktop\codits\Junction Intel challange\data\20261114_120510_red_good_a\0025_ground_color.png,red,skipped (no brick),no_brick,,11.4

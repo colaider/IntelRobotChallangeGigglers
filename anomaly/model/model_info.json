@@ -1,0 +1,28 @@
+{
+  "created": "2026-11-14 12:40:36",
+  "model": "PatchCore",
+  "backbone": "wide_resnet50_2",
+  "coreset_sampling_ratio": 0.1,
+  "precision": "fp16",
+  "image_size": 256,
+  "camera": "ground",
+  "threshold": 0.5,
+  "colours": [
+    "light_green",
+    "light_purple",
+    "light_yellow",
+    "red"
+  ],
+  "counts": {
+    "training/good": 69,
+    "test/good": 9,
+    "test/defective": 54
+  },
+  "train_seconds": 135.1,
+  "anomalib_test_metrics": {
+    "image_AUROC": 0.7481,
+    "image_F1Score": 0.8966
+  },
+  "openvino_xml": "openvino/model.xml",
+  "background": "background.png"
+}
