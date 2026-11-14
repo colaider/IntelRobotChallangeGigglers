@@ -29,15 +29,17 @@ every face for both cameras.
 
 ## Quick start: collecting the clean (static backdrop) dataset
 
-Team decision 2026-11-14. Collector with the **system Python** (`py`), everything else with the repo
+Team decision 2026-11-14: **every camera 640×480** (safest USB load, same field of view as the
+VLA demonstrations and the old data; trade-off: on the front camera the brick is ~150–250 px, so
+the smallest reliable mark is ~2–3 mm instead of ~1.5–2 mm at 1080p). Collector with the **system Python** (`py`), everything else with the repo
 `.venv`. Details for each step below.
 
 **Camera settings**
 
 | camera | name | resolution | fps | depth | note |
 |---|---|---|---|---|---|
-| front RealSense D415 (inspection) | `ground` | 1920×1080 | 15 | off | brick is closer than the D415 depth range anyway |
-| gripper webcam | `gripper` | 1920×1080 (else 1280×720) | 30 | — | MJPEG (set automatically) |
+| front RealSense D415 (inspection) | `ground` | 640×480 | 30 | off | brick is closer than the D415 depth range anyway |
+| gripper webcam | `gripper` | 640×480 | 30 | — | same mode as the VLA demonstrations |
 | top RealSense D415 (pick, VLA) | `top` | 640×480 | 30 | on | check with the VLA team before changing |
 
 ```bash
@@ -50,11 +52,11 @@ py collection/run.py --list
 # 2. camera + USB check, nothing saved (warnings: USB 2, fps far below asked, 1080p without MJPEG
 #    -> move a camera to another USB controller, lower fps, then resolution)
 py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> --no-robot \
-    --check-only --check-seconds 5 --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=640x480@30
+    --check-only --check-seconds 5 --cam ground=640x480@30:nodepth gripper=640x480@30 top=640x480@30
 
 # 3. collect: one session per colour and label; press `a` once (fixed exposure); SPACE = capture
 py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> \
-    --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=640x480@30 --name red_good_a --label good
+    --cam ground=640x480@30:nodepth gripper=640x480@30 top=640x480@30 --name red_good_a --label good
 #    per colour: <colour>_good_a, <colour>_good_b (test only), <colour>_defective_a (--label defective,
 #    then `d` + defect number in the window). Inspection poses only, every face with BOTH cameras.
 
@@ -95,10 +97,11 @@ Full instructions: [`collection/README.md`](../collection/README.md). Must-dos:
 - **Defective sessions:** draw real marker defects (line, stroke, dot, tiny 1–2 mm dot, near the
   edge); label with `d` + defect number in the collector.
 - **Discard** (BACKSPACE): motion blur, fingers on the brick, brick cut by the frame, mid-move frames.
-- **Resolution:** per camera with `--cam` (table in the quick start). The front camera at 1080p gives
-  ~14 px per mm on the brick (vs ~5 at 640×480) → small dots survive the crop to 256 px; training
-  and inference time barely change (models see 256×256). Collect at the resolution you will run at
-  and never mix resolutions in one model's data. Run the camera check (`--check-only`) first.
+- **Resolution:** 640×480 on every camera (quick start). The model always sees the brick at
+  256×256; on the gripper the brick is already ~240 px, on the front camera ~150–250 px (slightly
+  upscaled). If tiny dots (≤2 mm) turn out to matter, switch only the front camera to
+  `ground=1920x1080@15:nodepth` (inspection only, no VLA impact) and re-collect its sessions —
+  never mix resolutions in one model's data. Run the camera check (`--check-only`) first.
 - **Depth:** saved correctly (16-bit, millimetres; it only *looks* black in an image viewer). The
   front camera is closer to the brick than the D415 minimum range (~30 cm), so there is **no depth
   on the brick** → not usable for the inspection mask there. Top camera depth is fine (pick).

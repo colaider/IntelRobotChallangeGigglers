@@ -42,13 +42,12 @@ py collection/run.py --list
 (Unplug one RealSense to see which serial disappears; try `--usb test=N --no-realsense --no-robot`
 for each index to find the gripper camera. RealSense cameras also show up as USB indexes.)
 
-**Recommended camera settings (team decision, 14 Nov):** the front inspection camera at full
-colour resolution without depth (depth does not work that close anyway), the gripper webcam at
-1080p in MJPEG, the top camera small with depth (pick + VLA):
+**Camera settings (team decision, 14 Nov): every camera 640×480**, the front inspection camera
+without depth (it does not work that close anyway), the top camera with depth (pick + VLA):
 
 ```bash
 py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> \
-    --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=640x480@30 --name red_good_a
+    --cam ground=640x480@30:nodepth gripper=640x480@30 top=640x480@30 --name red_good_a
 ```
 
 `--cam NAME=WxH[@FPS][:nodepth]` overrides `--size` per camera. At start the collector runs a
