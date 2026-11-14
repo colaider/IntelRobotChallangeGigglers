@@ -10,16 +10,20 @@ every command runs from the repo root. Why the steps look like this:
         │
  vision/sessions.py --sheet  ──►  dataset/faces.csv     which face the front camera sees (label by hand)
         │
- vision/build_views.py  ──►  dataset/views/<view>/{training/good, test/good, test/defective}
-        │                    brick already cut out; look at qa.jpg
- vision/train.py --root dataset/views/<view>        one PatchCore model per view
- vision/export.py   ──►  OpenVINO IR (FP16/INT8)
- vision/calibrate.py ──► thresholds low/high (JSON)
- vision/inspect_brick.py ──► good / defective / uncertain per face, early exit per brick
+ vision/build_views.py  ──►  dataset/views/<camera>_<face>, <camera>_all     brick cut out; look at qa.jpg
+        │
+ vision/train_views.py  ──►  every variant: train → OpenVINO export → thresholds
+        │                    results/models/models.json (registry) + compare.md (single vs per_face)
+ vision/train_face_classifier.py (optional) ──► face classifier per camera, added to the registry
+        │
+ vision/inspector_bank.py  ──►  per face: cut out → face → score → good / defective / uncertain;
+                               per brick: early exit, faces seen / missing; mode single | per_face | classifier
 ```
 
-Views (one model each): `gripper_top` (gripper camera, top face after the grasp), `front_side`,
-`front_bottom` (front camera = RealSense `ground`), optional `front_top`.
+Cameras are never mixed. Per camera: `<camera>_top`, `<camera>_bottom`, `<camera>_side` (one model per
+face) and `<camera>_all` (one model for all faces) — cameras `gripper` and `front` (= RealSense `ground`).
+The brick's starting orientation is unknown, so any face can reach either camera: shoot and label
+every face for both cameras.
 
 ---
 
@@ -55,15 +59,16 @@ Colour-specific models are postponed; start with one model per view, all colours
 
 ## 2. Label faces (`dataset/faces.csv`)
 
-The front camera can see top / bottom / side, so every capture gets a face label:
+Both cameras can see top / bottom / side, so every capture gets two labels:
 
 ```bash
-.venv/bin/python vision/sessions.py --sheet ground gripper     # numbered contact sheets per session
+.venv/bin/python vision/sessions.py --add-missing             # adds empty rows for new captures
+.venv/bin/python vision/sessions.py --sheet ground gripper    # numbered contact sheets per session
 ```
 
-Add one row per capture to `dataset/faces.csv` (`session,id,face`, face ∈ `top bottom side none
-occluded`). `none` = no brick in the front view, `occluded` = fingers/cut off (both skipped).
-The gripper view needs no label (it always sees the top after the grasp).
+Fill `dataset/faces.csv` (`session,id,face,gripper_face`): `face` = what the front camera sees,
+`gripper_face` = what the gripper camera sees; values `top bottom side none occluded` (`none` = no
+brick in that view, `occluded` = fingers / cut off — skipped). Empty `gripper_face` counts as `top`.
 
 ## 3. Share the data
 
@@ -71,46 +76,52 @@ The gripper view needs no label (it always sees the top after the grasp).
 unpack into `data/`; commit only `dataset/faces.csv` and code. (Git LFS is an option if the team
 wants the raw sessions in the repo.)
 
-## 4. Build per-view datasets
+## 4. Build the datasets
 
 ```bash
-.venv/bin/python vision/build_views.py                  # all views -> dataset/views/<view>/
+.venv/bin/python vision/build_views.py          # -> dataset/views/<camera>_<face> and <camera>_all
 ```
 
-- Cuts the brick out per camera (`gripper`: fixed window between the jaws + segmentation;
-  front: background difference against the median empty scene) — same finders as at runtime.
-- Splits good frames into train / test **by arm-pose group and colour** (near-duplicates never
-  leak into test); frames of `defective` sessions go to `test/defective`.
-- **Look at `dataset/views/<view>/qa.jpg`** (every crop, labelled train/test) and `skipped.txt`
-  (crops the quality check rejected — they are not used). Bad crops → fix the setup or
-  `vision/finders.py` (`WINDOWS["gripper"]` window) before training.
+- Cuts the brick out per camera (`gripper`: fixed window between the jaws + segmentation; `front`:
+  difference to the median empty scene, saved as `dataset/views/front_background.png` because the
+  runtime needs the same reference) — the same finders as at runtime.
+- Splits good frames into train / test **by arm-pose group and colour**, the same split for every view
+  of a camera; frames of `defective` sessions go to `test/defective`.
+- **Look at `dataset/views/<view>/qa.jpg`** and `skipped.txt` (crops rejected by the quality check).
 
-## 5. Train, export, calibrate (per view)
+## 5. Train every variant (one command)
 
 ```bash
-V=front_side
-.venv/bin/python vision/train.py  --root dataset/views/$V --results results/$V
-.venv/bin/python vision/export.py --root dataset/views/$V --out results/$V/export \
-    --ckpt results/$V/Patchcore/bricks/v0/weights/lightning/model.ckpt
-.venv/bin/python vision/calibrate.py --seg none --xml results/$V/export/patchcore/fp16/weights/openvino/model.xml \
-    --good dataset/views/$V/test/good --defective dataset/views/$V/test/defective \
-    --out results/$V/calibration.json
+.venv/bin/python vision/train_views.py                    # single + per_face, both cameras
+.venv/bin/python vision/train_face_classifier.py          # optional: face classifier per camera
 ```
 
-- No `--seg` here: the crops are already brick-only.
-- Without real `test/defective` frames, `train.py` falls back to Anomalib's synthetic anomalies and
-  says so — metrics and thresholds are then indicative only.
-- `calibrate.py` warns when defective frames score below `low` (not separable → more data / light).
+- Per view: PatchCore training (synthetic anomalies if no real `test/defective`), OpenVINO FP16 export
+  (`--int8` for INT8 too), thresholds `low` / `high` from the clean test crops and the defective ones
+  (real if present, else synthetic marker defects — indicative).
+- Writes `results/models/models.json` (registry: camera → finder, background, models, thresholds,
+  classifier) and `results/models/compare.md`: **single vs per_face** per camera (AUROC, caught@0FA,
+  how often the competition picked the right face). Decide the default mode from this table.
 
-## 6. Check
+## 6. Check / use
 
 ```bash
-.venv/bin/python vision/inspect_brick.py --seg none --xml results/$V/export/patchcore/fp16/weights/openvino/model.xml \
-    --calib results/$V/calibration.json --folder dataset/views/$V/test
-.venv/bin/python vision/benchmark.py --root dataset/views/$V --models results/$V/export --devices CPU GPU NPU
+.venv/bin/python vision/inspector_bank.py --camera front --mode per_face \
+    --folder data/<session> --pattern "*_ground_color.png"
+.venv/bin/python vision/benchmark.py --root dataset/views/front_side --models results/models/front_side/export \
+    --devices CPU GPU NPU
 ```
 
-Write what you see (scores, misses, false alarms, latency per device) into `docs/experiments.md`.
+Robot code:
+
+```python
+from inspector_bank import InspectorBank
+bank = InspectorBank("results/models/models.json", mode="per_face", device="NPU")   # or single / classifier
+res = bank.inspect_brick(lambda step, attempt: grab(step), steps=[("G1", "gripper"), ("F1", "front"), ...])
+res["decision"]    # good / defective / uncertain / incomplete (+ res["missing"] faces)
+```
+
+Write what you see into `docs/experiments.md`.
 
 ## Checklist for a new dataset
 
@@ -119,9 +130,11 @@ Write what you see (scores, misses, false alarms, latency per device) into `docs
 - [ ] per colour: ≥2 good sessions (one test-only) + 1 defective session with real marks
 - [ ] `dataset/faces.csv` filled for every new capture
 - [ ] `build_views.py` run, `qa.jpg` looked at, `skipped.txt` reasonable
-- [ ] per view: train → export → calibrate → inspect → numbers in `docs/experiments.md`
+- [ ] `train_views.py` run, `compare.md` read (single vs per_face), default mode chosen
+- [ ] numbers in `docs/experiments.md`
 
 Known gaps (to adapt when the clean booth data arrives): the gripper window in `finders.py` was
-measured on the old hall frames (many crops rejected there), front-camera booth window not set
-yet (background difference is used), and `inspect_brick.py` runs one model at a time — a
-per-(camera, view) model bank comes next.
+measured on the old hall frames (many crops rejected there) and the front camera uses the
+background difference (a fixed booth window would be faster). On the old data the face competition
+picked the right face only ~50 % of the time (all models score high on noisy frames) while the
+classifier got 9/9 — re-check both on the clean data before choosing the default mode.

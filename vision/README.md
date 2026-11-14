@@ -258,9 +258,13 @@ Data collected with `collection/run.py` (`data/<session>/`, all cameras + arm po
 in `dataset/faces.csv` → one brick-only dataset per inspection view:
 
 ```bash
-python vision/build_views.py          # -> dataset/views/{gripper_top,front_side,front_bottom,front_top}/
-python vision/train.py --root dataset/views/front_side
+python vision/build_views.py          # -> dataset/views/<camera>_<face>, <camera>_all
+python vision/train_views.py          # all variants -> results/models/models.json + compare.md
 ```
+
+Variants, one command each: `train_views.py` (single + per-face models, registry + comparison),
+`train_face_classifier.py` (optional), `inspector_bank.py` (inspection with mode single / per_face /
+classifier, faces seen / missing per brick).
 
 Full step-by-step (collect, label, share, build, train, calibrate, check):
 [`docs/dataset_workflow.md`](../docs/dataset_workflow.md).

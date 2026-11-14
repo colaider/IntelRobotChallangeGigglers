@@ -1,28 +1,28 @@
-"""Turn robot collection sessions (data/<session>/ + dataset/faces.csv) into one Anomalib dataset per
-inspection VIEW, with the brick already cut out. TEMPORARY bridge until the clean booth data arrives;
-re-run it on every new collection.
+"""Turn robot collection sessions (data/<session>/ + dataset/faces.csv) into Anomalib datasets per
+camera x face, with the brick already cut out. Re-run it on every new collection.
 
-Views (team plan, docs/inspection_plan_2cam.md):
-    gripper_top   gripper camera after the grasp from above -> sees the top face   (finder: window)
-    front_side    front camera (D415 "ground"), a side face square-on              (finder: bg)
-    front_bottom  front camera, the bottom / cavity                                 (finder: bg)
-    front_top     front camera, top face (only if such frames exist)                (finder: bg)
+Cameras are never mixed (gripper and front see the brick completely differently). Per camera we
+build one dataset per face AND one with all faces, so the model variants can be compared:
 
-Output (gitignored), ready for train.py / export.py / calibrate.py (no --seg: crops are brick-only):
+    <camera>_<face>   gripper_top, gripper_bottom, gripper_side, front_top, front_bottom, front_side
+                      -> variant "per_face" (one model per face; face picked by competition or classifier)
+    <camera>_all      gripper_all, front_all
+                      -> variant "single" (one model for every face of that camera)
+
+Face labels (dataset/faces.csv): `face` = what the front camera ("ground") sees,
+`gripper_face` = what the gripper camera sees (empty = top). `none` / `occluded` frames are skipped.
+Brick cut-out per camera: gripper = fixed window between the jaws + segmentation, front =
+difference to the median empty scene (vision/finders.py) - the same finders as at runtime.
+
+Output (gitignored), ready for train_views.py (or train.py / export.py / calibrate.py, no --seg):
     dataset/views/<view>/training/good/*.png
     dataset/views/<view>/test/good/*.png          whole arm-pose groups held out, per colour
-    dataset/views/<view>/test/defective/*.png     frames of sessions labelled defective (if any)
-    dataset/views/<view>/qa.jpg, skipped.txt      look at qa.jpg before training
-
-Then per view:
-    python vision/train.py --root dataset/views/front_side
-    python vision/export.py --ckpt <ckpt> --root dataset/views/front_side
-    python vision/calibrate.py --xml <model.xml> --seg none \
-        --good dataset/views/front_side/test/good --defective dataset/views/front_side/test/defective
+    dataset/views/<view>/test/defective/*.png     frames of sessions labelled defective
+    dataset/views/<view>/qa.jpg, skipped.txt      LOOK at qa.jpg before training
 
 Example:
-    python vision/build_views.py                   # all views, data/ -> dataset/views/
-    python vision/build_views.py --views front_side --test-frac 0.3
+    python vision/build_views.py                          # every camera x face + *_all
+    python vision/build_views.py --cameras front --test-frac 0.3
 """
 
 import argparse
@@ -37,12 +37,11 @@ from finders import make_finder, median_background
 from segment import sheet
 from sessions import load_captures
 
-VIEWS = {  # view -> (camera, ground-camera face label or None = any brick in the gripper, finder)
-    "gripper_top": ("gripper", None, "window"),
-    "front_side": ("ground", "side", "bg"),
-    "front_bottom": ("ground", "bottom", "bg"),
-    "front_top": ("ground", "top", "bg"),
+CAMERAS = {  # view prefix -> (camera name in data/, finder, which label field)
+    "gripper": ("gripper", "window", "gripper_face"),
+    "front": ("ground", "bg", "face"),
 }
+FACES = ["top", "bottom", "side"]
 
 
 def parse_args() -> argparse.Namespace:
@@ -50,10 +49,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--data", type=Path, default=Path("data"))
     p.add_argument("--faces", type=Path, default=Path("dataset/faces.csv"))
     p.add_argument("--out", type=Path, default=Path("dataset/views"))
-    p.add_argument("--views", nargs="+", choices=VIEWS, default=list(VIEWS))
+    p.add_argument("--cameras", nargs="+", choices=CAMERAS, default=list(CAMERAS))
     p.add_argument("--test-frac", type=float, default=0.25, help="share of arm-pose groups held out per colour")
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
+
+
+def face_of(c, field: str) -> str:
+    f = (getattr(c, field) or "").strip()
+    return f if f else ("top" if field == "gripper_face" else "")
 
 
 def split(caps, test_frac: float, seed: int) -> dict[str, str]:
@@ -78,49 +82,54 @@ def main() -> None:
     caps_all = load_captures(args.data, args.faces)
     if not caps_all:
         raise SystemExit(f"no sessions in {args.data}")
-    backgrounds = {}
-    for view in args.views:
-        camera, face, finder_name = VIEWS[view]
-        if camera == "gripper":
-            caps = [c for c in caps_all if c.face != "occluded"]  # brick in the gripper, any ground view
-        else:
-            caps = [c for c in caps_all if c.face == face]
-        good = [c for c in caps if c.label != "defective"]
-        bad = [c for c in caps if c.label == "defective"]
-        if not good:
-            print(f"{view}: no frames, skipped")
+    summary = []
+    for prefix in args.cameras:
+        camera, finder_name, field = CAMERAS[prefix]
+        caps = [c for c in caps_all if face_of(c, field) in FACES]
+        if not caps:
+            print(f"{prefix}: no labelled frames (fill `{field}` in {args.faces}), skipped")
             continue
-        if finder_name == "bg" and camera not in backgrounds:  # fixed camera: empty scene = median frame
-            backgrounds[camera] = median_background([c.image(camera) for c in caps_all])
-        find = make_finder(finder_name, camera, backgrounds.get(camera))
+        background = median_background([c.image(camera) for c in caps_all]) if finder_name == "bg" else None
+        if background is not None:  # the runtime finder needs the same empty-scene reference
+            args.out.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(args.out / f"{prefix}_background.png"), background)
+        find = make_finder(finder_name, camera, background)
+        good = [c for c in caps if c.label != "defective"]
+        sp = split(good, args.test_frac, args.seed)  # one split per camera: same frames held out in every view
 
-        root = args.out / view
-        shutil.rmtree(root, ignore_errors=True)
-        sp = split(good, args.test_frac, args.seed)
-        jobs = [(c, "training/good" if sp[c.key] == "train" else "test/good") for c in good]
-        jobs += [(c, "test/defective") for c in bad]
-        tiles, skipped, counts = [], [], defaultdict(int)
-        for c, sub in jobs:
+        views = [f"{prefix}_{f}" for f in FACES] + [f"{prefix}_all"]
+        for v in views:
+            shutil.rmtree(args.out / v, ignore_errors=True)
+            for sub in ("training/good", "test/good", "test/defective"):
+                (args.out / v / sub).mkdir(parents=True, exist_ok=True)
+        tiles, skipped = defaultdict(list), defaultdict(list)
+        counts = defaultdict(lambda: defaultdict(int))
+        for c in caps:
+            face = face_of(c, field)
+            sub = "test/defective" if c.label == "defective" else (
+                "training/good" if sp[c.key] == "train" else "test/good")
             r = find(c.image(camera))
+            targets = [f"{prefix}_{face}", f"{prefix}_all"]
             if r.crop is None or not r.ok:
-                skipped.append(f"{c.key} ({sub}): {', '.join(r.reasons) or 'no brick'}")
+                for v in targets:
+                    skipped[v].append(f"{c.key} ({sub}): {', '.join(r.reasons) or 'no brick'}")
                 continue
-            d = root / sub
-            d.mkdir(parents=True, exist_ok=True)
-            cv2.imwrite(str(d / f"{c.key}.png"), r.crop)
-            counts[sub] += 1
-            t = r.crop.copy()
-            cv2.putText(t, sub.split("/")[0][:5], (6, 24), 0, 0.7, (0, 255, 255), 2)
-            tiles.append(t)
-        for sub in ("training/good", "test/good", "test/defective"):
-            (root / sub).mkdir(parents=True, exist_ok=True)
-        if tiles:
-            cv2.imwrite(str(root / "qa.jpg"), sheet(tiles, cols=10, size=140))
-        (root / "skipped.txt").write_text("\n".join(skipped) + "\n")
-        print(f"{view:13s} ({camera}, {finder_name}): train {counts['training/good']}, test good "
-              f"{counts['test/good']}, test defective {counts['test/defective']}, skipped {len(skipped)}"
-              f"  -> {root}/qa.jpg")
-    print("\nNo real defective frames yet -> train.py uses synthetic anomalies (indicative only).")
+            for v in targets:
+                cv2.imwrite(str(args.out / v / sub / f"{c.key}.png"), r.crop)
+                counts[v][sub] += 1
+                t = r.crop.copy()
+                cv2.putText(t, f"{sub.split('/')[0][:5]} {face}", (6, 24), 0, 0.6, (0, 255, 255), 2)
+                tiles[v].append(t)
+        for v in views:
+            if tiles[v]:
+                cv2.imwrite(str(args.out / v / "qa.jpg"), sheet(tiles[v], cols=10, size=140))
+            (args.out / v / "skipped.txt").write_text("\n".join(skipped[v]) + "\n")
+            k = counts[v]
+            summary.append(f"{v:15s} train {k['training/good']:3d}  test good {k['test/good']:3d}  "
+                           f"test defective {k['test/defective']:3d}  skipped {len(skipped[v]):3d}")
+    print("\n".join(summary))
+    print(f"\nLook at {args.out}/<view>/qa.jpg. Views without test/defective frames train on Anomalib's "
+          "synthetic anomalies (indicative only). Next: python vision/train_views.py")
 
 
 if __name__ == "__main__":

@@ -5,6 +5,8 @@ Run from the repo root with the system Python (needs a GUI OpenCV, not the Anoma
     py collection/run.py --rs ground=123456789012 top=987654321098 --usb gripper=2 --name red_good_a
     py collection/run.py                                          # every RealSense (rs1, rs2...), no USB cams
     py collection/run.py --no-robot --label defective --defects dot line scratch
+    py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=2 --no-robot --check-only \
+        --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=640x480@30   # USB / fps test, then exit
 
 Collect at the resolution you will RUN at (default 640x480 everywhere): on a RealSense, 640x480
 is 4:3 and sees a narrower field than 1280x720 (16:9), so other modes give other pictures.
@@ -54,7 +56,13 @@ def parse_args(argv=None) -> argparse.Namespace:
     p.add_argument("--no-realsense", action="store_true")
     p.add_argument("--usb", nargs="*", default=[], metavar="NAME=INDEX",
                    help="extra USB cameras, e.g. gripper=2 (or just 2)")
-    p.add_argument("--size", default="640x480", help="colour resolution WxH for every camera")
+    p.add_argument("--size", default="640x480", help="default colour resolution WxH (per camera: --cam)")
+    p.add_argument("--cam", nargs="*", default=[], metavar="NAME=WxH[@FPS][:nodepth]",
+                   help="per-camera settings, e.g. ground=1920x1080@15:nodepth gripper=1920x1080@30 "
+                        "top=640x480@30 (recommended set, see docs/dataset_workflow.md)")
+    p.add_argument("--check-seconds", type=float, default=3.0,
+                   help="USB / frame-rate check after opening the cameras (0 = skip)")
+    p.add_argument("--check-only", action="store_true", help="open the cameras, run the check, exit")
     p.add_argument("--rs-depth", default="640x480", help="RealSense depth resolution WxH")
     p.add_argument("--no-robot", action="store_true")
     p.add_argument("--port", default=None, help="robot COM port (auto if only one)")
@@ -67,6 +75,62 @@ def parse_args(argv=None) -> argparse.Namespace:
 def wh(s: str) -> tuple[int, int]:
     w, h = s.lower().split("x")
     return int(w), int(h)
+
+
+def cam_settings(items: list[str]) -> dict[str, dict]:
+    """['ground=1920x1080@15:nodepth'] -> {'ground': {'size': (1920, 1080), 'fps': 15, 'depth': False}}"""
+    out = {}
+    for it in items:
+        name, _, spec = it.partition("=")
+        spec, _, flag = spec.partition(":")
+        size, _, fps = spec.partition("@")
+        out[name] = {"size": wh(size) if size else None, "fps": int(fps) if fps else None,
+                     "depth": flag.lower() != "nodepth"}
+    return out
+
+
+def usb_check(cams, seconds: float) -> list[str]:
+    """Grab from every camera for a few seconds and report frame rate, dropped RealSense frames and
+    USB type. Problems here (USB 2, drops, low fps) show up as missing frames / freezes later."""
+    stats = {c.name: {"n": 0, "nums": []} for c in cams}
+    t0 = time.time()
+    while time.time() - t0 < seconds:
+        for c in cams:
+            f = c.grab()
+            stats[c.name]["n"] += 1
+            if "frame_number" in f.meta:
+                stats[c.name]["nums"].append(f.meta["frame_number"])
+    dt, warn = time.time() - t0, []
+    print(f"\nCamera check ({dt:.1f} s, all cameras streaming together):")
+    for c in cams:
+        s = stats[c.name]
+        want = getattr(c, "fps", None) or (c.info.get("fps") if isinstance(c.info, dict) else None)
+        nums = s["nums"]
+        # RealSense: frames the CAMERA produced (frame numbers) - below the asked rate = USB / bandwidth
+        # problem. USB webcams: only frames we read (lower bound, the loop reads cameras in turn).
+        produced = (nums[-1] - nums[0]) / dt if len(nums) > 1 else None
+        fps = produced if produced is not None else s["n"] / dt
+        usb = c.info.get("usb", "") if isinstance(c.info, dict) else ""
+        ci = c.info.get("color_intrinsics", {}) if isinstance(c.info, dict) else {}
+        size = f"{ci.get('width', c.info.get('width', '?'))}x{ci.get('height', c.info.get('height', '?'))}"
+        line = (f"  {c.name:8s} {size:10s} {fps:5.1f} fps " + ("produced" if produced is not None else "read")
+                + (f" (asked {want})" if want else "") + (f"  USB {usb}" if usb else "")
+                + (f"  {c.info.get('fourcc')}" if isinstance(c.info, dict) and c.info.get("fourcc") else ""))
+        print(line)
+        if str(usb).startswith("2"):
+            warn.append(f"{c.name}: USB 2 - use a blue USB 3 port")
+        limit = 0.8 if produced is not None else 0.3
+        if want and fps < limit * float(want):
+            warn.append(f"{c.name}: {fps:.1f} fps, asked {want} - bandwidth? lower fps / resolution, "
+                        "move to another USB controller")
+        if isinstance(c.info, dict) and c.info.get("fourcc") not in (None, "?", "MJPG") and size.startswith("1920"):
+            warn.append(f"{c.name}: 1080p without MJPEG ({c.info.get('fourcc')}) - usually slow on webcams")
+    for w in warn:
+        print("  WARNING " + w)
+    if not warn:
+        print("  ok")
+    print()
+    return warn
 
 
 def named(items: list[str], prefix: str) -> list[tuple[str, str]]:
@@ -103,6 +167,12 @@ def print_devices() -> None:
 def open_devices(args):
     """Returns (cameras, robot). Each part that fails is reported and skipped."""
     size, cams = wh(args.size), []
+    per = cam_settings(args.cam)
+
+    def cfg(name):
+        c = per.get(name, {})
+        return c.get("size") or size, c.get("fps"), c.get("depth", True)
+
     if not args.no_realsense:
         try:
             pairs = (named(args.rs, "rs") if args.rs
@@ -112,14 +182,18 @@ def open_devices(args):
             print(f"[realsense] not used: {e}")
         for name, serial in pairs:
             try:
-                cams.append(RealSenseCamera(name, serial, color=size, depth=wh(args.rs_depth)).start())
-                print(f"[{name}] RealSense {serial} ok")
+                csize, fps, depth_on = cfg(name)
+                cams.append(RealSenseCamera(name, serial, color=csize, depth=wh(args.rs_depth), fps=fps or 30,
+                                            depth_on=depth_on).start())
+                print(f"[{name}] RealSense {serial} ok: {csize[0]}x{csize[1]}@{fps or 30}"
+                      + ("" if depth_on else ", no depth"))
             except Exception as e:  # noqa: BLE001 - show any device problem, keep going
                 print(f"[{name}] RealSense {serial} not used: {e}")
     for name, idx in named(args.usb, "cam"):
         try:
-            cams.append(UsbCamera(int(idx), size, name).start())
-            print(f"[{name}] USB camera {idx} ok")
+            csize, fps, _ = cfg(name)
+            cams.append(UsbCamera(int(idx), csize, name, fps=fps).start())
+            print(f"[{name}] USB camera {idx} ok: {cams[-1].info}")
         except Exception as e:  # noqa: BLE001
             print(f"[{name}] USB camera {idx} not used: {e}")
     robot = None
@@ -191,6 +265,14 @@ def main(argv=None) -> None:
     cams, robot = open_devices(args)
     if not cams:
         raise SystemExit("No camera available - nothing to collect (try --list).")
+    if args.check_seconds > 0 or args.check_only:
+        usb_check(cams, args.check_seconds or 3.0)
+    if args.check_only:
+        for c in cams:
+            c.stop()
+        if robot:
+            robot.close()
+        return
     rs_cams = [c for c in cams if isinstance(c, RealSenseCamera)]
     auto = not args.manual_exposure
     if not auto:

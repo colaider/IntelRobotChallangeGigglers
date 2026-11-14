@@ -42,6 +42,22 @@ py collection/run.py --list
 (Unplug one RealSense to see which serial disappears; try `--usb test=N --no-realsense --no-robot`
 for each index to find the gripper camera. RealSense cameras also show up as USB indexes.)
 
+**Recommended camera settings (team decision, 14 Nov):** the front inspection camera at full
+colour resolution without depth (depth does not work that close anyway), the gripper webcam at
+1080p in MJPEG, the top camera small with depth (pick + VLA):
+
+```bash
+py collection/run.py --rs ground=<serial> top=<serial> --usb gripper=<index> \
+    --cam ground=1920x1080@15:nodepth gripper=1920x1080@30 top=640x480@30 --name red_good_a
+```
+
+`--cam NAME=WxH[@FPS][:nodepth]` overrides `--size` per camera. At start the collector runs a
+3 s **camera check** (`--check-seconds`, `--check-only` to just test): frames each RealSense
+actually produces vs asked, USB type, webcam format. Warnings there (USB 2, fps far below the
+asked rate, 1080p without MJPEG) mean missing frames / freezes later: move a camera to another
+USB controller, lower the fps first (stills do not need 30 fps), then the resolution.
+Never mix resolutions within one model's data.
+
 **Resolution: collect at what you will run at.** Everything defaults to 640x480. On a RealSense,
 640x480 is 4:3 and sees a narrower field than 1280x720 (16:9), so a model trained on another
 mode sees different pictures. 640x480 is enough here: on our gripper photos the brick is

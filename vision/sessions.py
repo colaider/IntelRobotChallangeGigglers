@@ -8,7 +8,10 @@ captures that the experiment runner (vision/experiment.py) can filter and split.
     caps = load_captures()                       # all sessions in data/
     caps[0].image("ground"), caps[0].depth("top"), caps[0].face, caps[0].pose_group
 
-Face labels live in dataset/faces.csv (session,id,face), one row per capture:
+Face labels live in dataset/faces.csv (session,id,face,gripper_face), one row per capture.
+`face` = what the front (ground) camera sees, `gripper_face` = what the gripper camera sees
+(optional, empty = top: after a grasp from above the gripper usually looks at the top).
+Values:
     top       studs facing the ground camera
     bottom    cavity (tube) facing the camera
     side      a side face (studs on the outline)
@@ -50,8 +53,9 @@ class Capture:
     label: str
     defect: str
     pose: dict = field(default_factory=dict)  # joint -> degrees
-    face: str = ""
+    face: str = ""            # what the FRONT (ground) camera sees
     depth_scale: dict = field(default_factory=dict)  # camera -> metres per unit
+    gripper_face: str = ""    # what the GRIPPER camera sees (top / bottom / side / occluded); "" = top
 
     @property
     def key(self) -> str:
@@ -76,15 +80,20 @@ class Capture:
         return d.astype(np.float32) * self.depth_scale.get(camera, 0.001) * 1000
 
 
-def load_faces(path: Path = FACES_CSV) -> dict[tuple[str, str], str]:
+def load_face_rows(path: Path = FACES_CSV) -> dict[tuple[str, str], dict]:
+    """(session, id) -> row. Columns: session,id,face[,gripper_face] (gripper_face optional)."""
     if not path.exists():
         return {}
     with path.open(newline="") as f:
-        return {(r["session"], r["id"].zfill(4)): r["face"] for r in csv.DictReader(f)}
+        return {(r["session"], r["id"].zfill(4)): r for r in csv.DictReader(f)}
+
+
+def load_faces(path: Path = FACES_CSV) -> dict[tuple[str, str], str]:
+    return {k: r.get("face", "") for k, r in load_face_rows(path).items()}
 
 
 def load_captures(data: Path = DATA, faces_csv: Path = FACES_CSV) -> list[Capture]:
-    faces = load_faces(faces_csv)
+    faces = load_face_rows(faces_csv)
     caps = []
     for s in sorted(p for p in Path(data).iterdir() if (p / "manifest.csv").exists()):
         info = json.loads((s / "session.json").read_text())
@@ -92,8 +101,10 @@ def load_captures(data: Path = DATA, faces_csv: Path = FACES_CSV) -> list[Captur
         with (s / "manifest.csv").open(newline="") as f:
             for row in csv.DictReader(f):
                 pose = {j: float(row[f"{j}_deg"]) for j in JOINTS if row.get(f"{j}_deg") not in (None, "")}
+                fr = faces.get((s.name, row["id"]), {})
                 caps.append(Capture(s, row["id"], row.get("color") or colour_of(s), row.get("label") or "good",
-                                    row.get("defect", ""), pose, faces.get((s.name, row["id"]), ""), scales))
+                                    row.get("defect", ""), pose, fr.get("face", ""), scales,
+                                    (fr.get("gripper_face") or "").strip()))
     return caps
 
 
@@ -117,8 +128,32 @@ def main() -> None:
     p.add_argument("--data", type=Path, default=DATA)
     p.add_argument("--sheet", nargs="+", default=["ground"], metavar="CAMERA")
     p.add_argument("--out", type=Path, default=Path("results/sessions/sheets"))
+    p.add_argument("--add-missing", action="store_true",
+                   help="append a row (empty labels) to dataset/faces.csv for every capture not in it yet")
     args = p.parse_args()
     caps = load_captures(args.data)
+    if args.add_missing:
+        rows = load_face_rows(FACES_CSV)
+        new = [c for c in caps if (c.session.name, c.id) not in rows]
+        header = not FACES_CSV.exists()
+        cols = ["session", "id", "face", "gripper_face"]
+        if not header:  # keep the existing header; add gripper_face if it is missing
+            with FACES_CSV.open(newline="") as f:
+                old_cols = next(csv.reader(f), [])
+            if "gripper_face" not in old_cols:
+                old = list(load_face_rows(FACES_CSV).values())
+                with FACES_CSV.open("w", newline="") as f:
+                    w = csv.DictWriter(f, cols, extrasaction="ignore")
+                    w.writeheader()
+                    w.writerows(old)
+        with FACES_CSV.open("a", newline="") as f:
+            w = csv.DictWriter(f, cols)
+            if header:
+                w.writeheader()
+            for c in new:
+                w.writerow({"session": c.session.name, "id": c.id, "face": "", "gripper_face": ""})
+        print(f"{len(new)} rows added to {FACES_CSV} - fill face (front camera) and gripper_face "
+              "(gripper camera: top / bottom / side / occluded; empty = top)")
     args.out.mkdir(parents=True, exist_ok=True)
     by_session: dict[str, list[Capture]] = {}
     for c in caps:

@@ -65,8 +65,10 @@ class RealSenseCamera:
     """Colour + aligned depth from one RealSense. Usage: cam = RealSenseCamera("top", serial).start()."""
 
     def __init__(self, name: str = "realsense", serial: str | None = None, color=(640, 480), depth=(640, 480),
-                 fps=30, warmup: int = 30):
-        self.color_size, self.depth_size, self.fps = color, depth, fps
+                 fps=30, warmup: int = 30, depth_on: bool = True):
+        """depth_on=False: colour only (e.g. the front inspection camera, where the brick is closer
+        than the D415 minimum range anyway) - frees USB bandwidth for a higher colour resolution."""
+        self.color_size, self.depth_size, self.fps, self.depth_on = color, depth, fps, depth_on
         self.serial, self.warmup = serial, warmup
         self.name = name
         self._pipe = self._align = self._color_sensor = None
@@ -82,10 +84,11 @@ class RealSenseCamera:
         if self.serial:
             cfg.enable_device(self.serial)
         cfg.enable_stream(rs.stream.color, *self.color_size, rs.format.bgr8, self.fps)
-        cfg.enable_stream(rs.stream.depth, *self.depth_size, rs.format.z16, self.fps)
+        if self.depth_on:
+            cfg.enable_stream(rs.stream.depth, *self.depth_size, rs.format.z16, self.fps)
         self._pipe = rs.pipeline()
         profile = self._pipe.start(cfg)
-        self._align = rs.align(rs.stream.color)
+        self._align = rs.align(rs.stream.color) if self.depth_on else None
         dev = profile.get_device()
         depth_sensor = dev.first_depth_sensor()
         try:
@@ -104,7 +107,10 @@ class RealSenseCamera:
             "color_intrinsics": {"width": intr.width, "height": intr.height, "fx": intr.fx, "fy": intr.fy,
                                  "ppx": intr.ppx, "ppy": intr.ppy, "model": str(intr.model),
                                  "coeffs": list(intr.coeffs)},
-            "fps": self.fps, "depth_size": list(self.depth_size),
+            "fps": self.fps, "depth_size": list(self.depth_size) if self.depth_on else None,
+            "depth_enabled": self.depth_on,
+            "usb": dev.get_info(rs.camera_info.usb_type_descriptor)
+            if dev.supports(rs.camera_info.usb_type_descriptor) else "?",
         }
         return self
 
@@ -143,15 +149,19 @@ class RealSenseCamera:
 
     # -- frames ------------------------------------------------------------
     def grab(self) -> Frame:
-        frames = self._align.process(self._pipe.wait_for_frames())
-        c, d = frames.get_color_frame(), frames.get_depth_frame()
+        frames = self._pipe.wait_for_frames()
+        if self._align is not None:
+            frames = self._align.process(frames)
+        c = frames.get_color_frame()
+        d = frames.get_depth_frame() if self.depth_on else None
         meta = {"timestamp_ms": c.get_timestamp(), "frame_number": c.get_frame_number()}
         md = self._rs.frame_metadata_value
         for key, m in (("actual_exposure", md.actual_exposure), ("gain_level", md.gain_level)):
             if c.supports_frame_metadata(m):
                 meta[key] = c.get_frame_metadata(m)
         meta.update(self.exposure_state())
-        return Frame(np.asanyarray(c.get_data()).copy(), np.asanyarray(d.get_data()).copy(), meta)
+        depth = np.asanyarray(d.get_data()).copy() if d else None
+        return Frame(np.asanyarray(c.get_data()).copy(), depth, meta)
 
     def stop(self) -> None:
         if self._pipe:
@@ -165,8 +175,11 @@ class UsbCamera:
     driver reports is stored with every frame either way.
     """
 
-    def __init__(self, index: int, size=(640, 480), name: str | None = None):
-        self.index, self.size, self.name = index, size, name or f"cam{index}"
+    def __init__(self, index: int, size=(640, 480), name: str | None = None, fps: int | None = None,
+                 mjpg: bool = True):
+        """mjpg=True asks for compressed MJPEG: most webcams give 1080p only in MJPEG (YUYV 1080p is
+        often 5 fps) and it uses a fraction of the USB bandwidth."""
+        self.index, self.size, self.name, self.fps, self.mjpg = index, size, name or f"cam{index}", fps, mjpg
         self._cap = None
         self.info: dict = {}
 
@@ -174,12 +187,19 @@ class UsbCamera:
         self._cap = cv2.VideoCapture(self.index, cv2.CAP_DSHOW)
         if not self._cap.isOpened():  # some cameras only open with Media Foundation
             self._cap = cv2.VideoCapture(self.index)
+        if self.mjpg:  # must be set before the size
+            self._cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.size[0])
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.size[1])
+        if self.fps:
+            self._cap.set(cv2.CAP_PROP_FPS, self.fps)
         if not self._cap.isOpened():
             raise RuntimeError(f"Cannot open camera {self.index}")
+        fourcc = int(self._cap.get(cv2.CAP_PROP_FOURCC))
         self.info = {"index": self.index, "width": int(self._cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-                     "height": int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT))}
+                     "height": int(self._cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                     "fps": self._cap.get(cv2.CAP_PROP_FPS),
+                     "fourcc": "".join(chr((fourcc >> 8 * i) & 0xFF) for i in range(4)) if fourcc else "?"}
         if (self.info["width"], self.info["height"]) != tuple(self.size):
             print(f"[{self.name}] asked {self.size[0]}x{self.size[1]}, camera gives "
                   f"{self.info['width']}x{self.info['height']}")
