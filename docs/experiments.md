@@ -134,3 +134,32 @@ PatchCore, 3 seeds each, model's own threshold.
   colour as the brick, real shadows of the gripper on the brick.
 
 **Decision: use `--roi` for training and inference** (and `Scorer(..., roi=True)` in robot code).
+
+## 2026-11-14 — Ivan's gripper frames on a cluttered background (raw 1920×1080, MacBook CPU)
+
+Data: `dataset/raw/training/good` (311b77d), 30 full frames: brick held in the gripper (gripper held
+by hand), camera fixed and tilted ~30°, busy background (wooden table, rails, blue balloon, ceiling
+lights, people's faces). Colours: cream (0–6), red (7–11, 21–29), very pale lilac (12–20).
+Only `good` exists yet, so: 20 frames train, 10 held out as `test/good`; 15 synthetic black marks
+(dot 16 px, dot 32 px, 120 px line) on the 5 red held-out frames (red is easy to mask) as `test/defective`.
+PatchCore, seed 1.
+
+| input | AUROC | clean scores | false alarms @0.5 | caught @0.5 | caught at 0 false alarms |
+|---|---|---|---|---|---|
+| full frame | 0.78 | 0.18–1.00 | 5/10 | 14/15 | 0/15 |
+| centre 700 crop | **1.00** | 0.00–0.17 | **0/10** | 13/15 | **15/15** |
+| `--roi` (roi.py) | 0.31 | 0.64–1.00 | 10/10 | 15/15 | 0/15 |
+| old white-table model, full | 0.50 | 1.00 | 10/10 | – | 0/15 |
+| old white-table model, centre | 0.70 | 0.91–1.00 | 10/10 | – | 0/15 |
+
+- **Full frame fails** because people/hands in the background change: the heatmap of a clean brick
+  lights up on a face (score 1.00).
+- **roi.py fails on clutter**: it found the brick in 1/10 test frames; otherwise it cut out the table
+  or the blue balloon (it assumes a plain background and takes the most colourful blob).
+- **Centre crop works** here because the gripper is held roughly in the image centre: clean bricks stay
+  cold, the line is localised exactly. The 2 misses at 0.5 are 16 px dots (scores just under 0.5);
+  with a threshold from clean frames (0.17) all 15 are caught → threshold calibration matters again.
+- **A model does not transfer between setups**: the white-table model calls every gripper frame defective.
+  Retrain per camera/background setup.
+- Caveats: 10 test frames from the same sequences as training (optimistic), synthetic defects only on red,
+  one seed. Need Ivan's real `test/good` + `test/defective` in this setup to confirm.
