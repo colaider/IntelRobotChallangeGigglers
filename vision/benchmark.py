@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--models", type=Path, default=Path("results/export"), help="folder searched for model.xml")
     p.add_argument("--devices", nargs="+", default=["CPU", "GPU", "NPU"])
-    p.add_argument("--root", type=Path, default=Path("dataset"), help="dataset root with test/good, test/defective")
+    p.add_argument("--root", type=Path, default=Path("dataset/processed"), help="dataset root with test/good, test/defective")
     p.add_argument("--runs", type=int, default=50, help="timed runs for latency")
     p.add_argument("--warmup", type=int, default=5)
     p.add_argument("--csv", type=Path, default=Path("results/benchmark.csv"))

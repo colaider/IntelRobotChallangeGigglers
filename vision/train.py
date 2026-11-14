@@ -24,7 +24,7 @@ MODELS = {"patchcore": Patchcore, "padim": Padim, "stfpm": Stfpm}
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--root", type=Path, default=Path("dataset"))
+    p.add_argument("--root", type=Path, default=Path("dataset/processed"))
     p.add_argument("--name", default="bricks")
     p.add_argument("--normal-dir", default="training/good")
     p.add_argument("--normal-test-dir", default="test/good")

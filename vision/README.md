@@ -6,7 +6,7 @@ Run in **Terminal.app** (not via `!` in Claude Code): the preview window needs t
 for SPACE / Q, and the script must run from the repo root with the venv active.
 
 ```bash
-cd ~/projects/IntelRobotChallangeGigglers && source .venv/bin/activate && python vision/capture.py --split training --cls good --crop 700
+cd ~/projects/IntelRobotChallangeGigglers && source .venv/bin/activate && python vision/capture.py --split training --cls good
 ```
 
 macOS asks for camera access for Terminal on the first run. Step-by-step guide for the
@@ -31,16 +31,20 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 ## 1. Capture photos
 
 ```bash
-python vision/capture.py --split training --cls good --crop 700
-python vision/capture.py --split test --cls good --crop 700
-python vision/capture.py --split test --cls defective --crop 700
+python vision/capture.py --split training --cls good
+python vision/capture.py --split test --cls good
+python vision/capture.py --split test --cls defective
+python vision/preprocess.py --crop 0        # dataset/raw -> dataset/processed (model input)
 ```
 
-- The green box in the preview is what gets saved. Place the brick so it fills most of it.
-  Models resize everything to 256x256, so a tight square crop matters.
-- Keep the same camera, light, background, distance and `--crop` for all three folders.
-- Files are named `<date>_<time>_c<crop>_<NNN>.png`, so several people can add photos without
-  clashes, and a different crop shows up in the name (`ls dataset/*/* | grep -v _c700_`).
+- `capture.py` saves the **full frame** to `dataset/raw/...`; the green box is only a preview.
+  Cropping happens later (`preprocess.py --crop N` centre square, or `train.py --roi`), so
+  raw frames can be re-cropped without reshooting.
+- `preprocess.py` refuses to overwrite: delete `dataset/processed` (or `vision/clear_data.sh`,
+  which moves raw + processed to the macOS Trash) before re-running. `--median 3|5` exists but
+  made no difference in our test (frames are downscaled to 256 px anyway).
+- Keep the same camera, light, background and distance within one dataset version.
+- Files are named `<date>_<time>_<uuid8>_<NNN>.png`, unique across machines.
 - Layout and rules: [`dataset/README.md`](../dataset/README.md).
 - Aim for 20–30 in `training/good` and at least 10 each in `test/good` and `test/defective`
   (half of `test/` is used to pick the threshold).
@@ -48,7 +52,7 @@ python vision/capture.py --split test --cls defective --crop 700
 ## 2. Train
 
 ```bash
-python vision/train.py                    # PatchCore on dataset/
+python vision/train.py                    # PatchCore on dataset/processed
 python vision/train.py --model padim
 ```
 
@@ -58,7 +62,7 @@ Prints test metrics (image AUROC, F1) and the checkpoint path under `results/`.
 
 ```bash
 python vision/predict.py --ckpt results/Patchcore/bricks/v0/weights/lightning/model.ckpt \
-    --input dataset/test/defective --out results/predict
+    --input dataset/processed/test/defective --out results/predict
 ```
 
 Prints score and label per image and writes `*_heat.png`. Heatmaps use a fixed scale:
@@ -69,7 +73,7 @@ score 0.5 is the decision threshold, so a good brick should stay blue.
 ## 4. Synthetic defects (evaluation only)
 
 ```bash
-python vision/synth_defects.py --input dataset/test/good --copy-good dataset/training/good \
+python vision/synth_defects.py --input dataset/processed/test/good --copy-good dataset/processed/training/good \
     --out dataset_synth --per-image 3
 python vision/train.py --root dataset_synth
 ```
@@ -84,7 +88,7 @@ own colour, the hardest case).
 **Sensitivity table** — smallest defect we catch, per marker colour and brick colour:
 
 ```bash
-python vision/synth_defects.py --input dataset/test/good --out dataset_sweep \
+python vision/synth_defects.py --input dataset/processed/test/good --out dataset_sweep \
     --sweep 4 8 12 16 24 32 --inks black blue red purple tone
 python vision/sensitivity.py --xml results/export/patchcore/fp16/weights/openvino/model.xml \
     --root dataset_sweep --by-colour

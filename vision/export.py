@@ -24,7 +24,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ckpt", type=Path, required=True)
     p.add_argument("--model", choices=MODELS, default="patchcore")
     p.add_argument("--precisions", nargs="+", choices=PRECISIONS, default=list(PRECISIONS))
-    p.add_argument("--root", type=Path, default=Path("dataset"), help="dataset root (INT8 calibration)")
+    p.add_argument("--root", type=Path, default=Path("dataset/processed"), help="dataset root (INT8 calibration)")
     p.add_argument("--out", type=Path, default=Path("results/export"))
     return p.parse_args()
 

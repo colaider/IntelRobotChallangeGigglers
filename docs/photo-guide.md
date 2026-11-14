@@ -14,14 +14,14 @@ marker, desk lamp.
 2. Camera fixed above the sheet looking down, ~20 cm high (books, tripod, tape). Not hand-held.
 3. Lamp from the side at ~45°, ceiling light off.
 4. Brick lies on its side, a side face up. Always photograph this same face type.
-5. Start capture (see command below). Adjust the camera so the brick fills most of the
-   green box. Keep `--crop 700` (or whatever you pick) **the same for all three folders**.
+5. Start capture (see command below). Full frames are saved to `dataset/raw/`; the green box
+   is only a guide. Keep the camera position the same for all three folders.
 
 ## Command (Terminal.app, from the repo root)
 
 ```bash
 cd ~/projects/IntelRobotChallangeGigglers && source .venv/bin/activate
-python vision/capture.py --split training --cls good --crop 700
+python vision/capture.py --split training --cls good
 ```
 
 SPACE saves, Q quits. Change `--split` / `--cls` for the other folders.
@@ -40,8 +40,9 @@ Draw the defects only after `training/good` and `test/good` are done.
 ## Then
 
 ```bash
+python vision/preprocess.py --crop 0
 python vision/train.py
-python vision/predict.py --ckpt results/Patchcore/bricks/v0/weights/lightning/model.ckpt --input dataset/test --out results/predict
+python vision/predict.py --ckpt results/Patchcore/bricks/v0/weights/lightning/model.ckpt --input dataset/processed/test --out results/predict
 ```
 
 Write down what you see (does the marker light up, do highlights/shadows?) in `docs/experiments.md`.

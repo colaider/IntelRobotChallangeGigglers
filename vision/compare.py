@@ -23,7 +23,7 @@ from export import export
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--models", nargs="+", choices=MODELS, default=["patchcore", "padim", "stfpm"])
-    p.add_argument("--root", type=Path, default=Path("dataset"))
+    p.add_argument("--root", type=Path, default=Path("dataset/processed"))
     p.add_argument("--precision", choices=["fp32", "fp16", "int8"], default="fp16")
     p.add_argument("--devices", nargs="+", default=["CPU"])
     p.add_argument("--epochs", type=int, default=None, help="override max epochs for trainable models")
