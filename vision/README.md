@@ -78,6 +78,42 @@ Draws marker-like lines, curves, dots, tiny 1–2 mm dots, scribbles and edge de
 brick (found by colour saturation), with pixel masks in `test/masks/`. `dataset_synth/` is
 gitignored. Never put synthetic images into `training/`.
 
+Inks: `black blue red green purple orange yellow tone` (`tone` = darker shade of the brick's
+own colour, the hardest case).
+
+**Sensitivity table** — smallest defect we catch, per marker colour and brick colour:
+
+```bash
+python vision/synth_defects.py --input dataset/test/good --out dataset_sweep \
+    --sweep 4 8 12 16 24 32 --inks black blue red purple tone
+python vision/sensitivity.py --xml results/export/patchcore/fp16/weights/openvino/model.xml \
+    --root dataset_sweep --by-colour
+```
+
+Brick colour comes from an HSV check (`synth_defects.brick_colour`), the same one planned for
+routing bricks to per-colour models. It only picks a colour, never judges defects.
+
+## 4b. Augment good images (optional)
+
+```bash
+python vision/train.py --augment 3            # + 3 variations per good image
+python vision/train.py --augment 3 --aug-flip # also mirror (symmetric faces only)
+```
+
+Small rotation/shift/scale and brightness/contrast only — never colour changes, which would
+make a coloured marker look "normal". `--seed` (default 42) makes runs comparable.
+
+## 4c. Brick ROI (optional)
+
+```bash
+python vision/train.py --roi                       # train/test on aligned brick-only crops
+python vision/predict.py --ckpt ... --input ... --roi
+```
+
+`vision/roi.py` finds the brick per frame (chroma/saturation vs the border colour), straightens
+it, crops it and greys out gripper/table, so only the brick is judged. Off by default; use the
+same `--roi` for training and inference (`benchmark.Scorer(..., roi=True)`).
+
 ## 5. Export to OpenVINO (FP32 / FP16 / INT8)
 
 ```bash

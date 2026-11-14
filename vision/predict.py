@@ -22,6 +22,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--model", choices=MODELS, default="patchcore")
     p.add_argument("--accelerator", default="cpu")
     p.add_argument("--out", type=Path, default=Path("results/predict"))
+    p.add_argument("--roi", action="store_true", help="align bricks first (model trained with --roi)")
     return p.parse_args()
 
 
@@ -42,8 +43,13 @@ def overlay(image_path: Path, anomaly_map, out_path: Path) -> None:
 def main() -> None:
     args = parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
+    data = args.input
+    if args.roi:
+        from roi import align_tree
+        data = args.out / "roi_input"
+        align_tree(args.input, data)
     engine = Engine(default_root_dir=args.out, accelerator=args.accelerator)
-    preds = engine.predict(model=MODELS[args.model](), data_path=args.input, ckpt_path=args.ckpt)
+    preds = engine.predict(model=MODELS[args.model](), data_path=data, ckpt_path=args.ckpt)
 
     print(f"{'image':40s} {'score':>7s}  label")
     for batch in preds:

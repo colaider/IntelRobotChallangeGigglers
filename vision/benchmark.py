@@ -49,11 +49,19 @@ def input_hw(xml: Path) -> tuple[int, int] | None:
 class Scorer:
     """OpenVINO inferencer + the resize a static-shape model needs. Use this from robot code too."""
 
-    def __init__(self, xml: Path, device: str = "AUTO"):
+    def __init__(self, xml: Path, device: str = "AUTO", roi: bool = False):
+        """roi=True: cut out + straighten the brick first (model must be trained with --roi)."""
         self.inf = OpenVINOInferencer(path=xml, device=device)
         self.hw = input_hw(xml)
+        self.roi = roi
 
     def __call__(self, rgb: np.ndarray):
+        if self.roi:
+            from roi import align
+            crop, _ = align(cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), size=self.hw[0] if self.hw else 256)
+            if crop is None:
+                raise ValueError("no brick found in frame")  # robot code: treat as 'uncertain'
+            rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
         if self.hw and rgb.shape[:2] != self.hw:
             rgb = cv2.resize(rgb, (self.hw[1], self.hw[0]), interpolation=cv2.INTER_AREA)
         return self.inf.predict(rgb)
