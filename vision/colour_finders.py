@@ -59,12 +59,15 @@ def _blob(mask, prefer_xy=None, drop_border=False, bridge=15, min_frac=0.01):
 
 
 def _finish(bgr, mask, hull=True, fg=None, refine=None, keep_px=None, open_frac=None, hue_trim=None, glare=(60, 0),
-            min_area=0.02):
+            min_area=0.02, close_px=0, allow_extra=None):
     keep_px = 3 if keep_px is None else keep_px
     open_frac = open_frac or 0.0
     if mask is None or mask.sum() == 0:
         raise ValueError("no brick found")
     mask = clean_mask(mask)
+    if close_px:  # dilate then erode: fills notches / gaps narrower than the kernel (glare, pale spots)
+        mask = clean_mask(cv2.morphologyEx(mask, cv2.MORPH_CLOSE,
+                                           cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * close_px + 1,) * 2)))
     if refine if refine is not None else fg is not None:  # drop off-colour pieces (shadow, wood, jaws)
         mask = refine_by_colour(bgr, mask)
     if hull:
@@ -74,7 +77,9 @@ def _finish(bgr, mask, hull=True, fg=None, refine=None, keep_px=None, open_frac=
         h = np.zeros_like(mask)
         cv2.drawContours(h, [cv2.convexHull(np.vstack(cnts))], -1, 1, -1)
         hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-        allowed = (colour_mask(bgr, min_s=25) > 0) | ((hsv[..., 2] > 170) & (hsv[..., 1] < 80))
+        allowed = (colour_mask(bgr, min_s=25) > 0) | (pale_mask(bgr) > 0) | ((hsv[..., 2] > 170) & (hsv[..., 1] < 80))
+        if allow_extra is not None:
+            allowed |= allow_extra > 0
         allowed = cv2.dilate(allowed.astype(np.uint8), np.ones((7, 7), np.uint8))
         if fg is not None:  # never fill with static background (table, paper)
             allowed &= fg
@@ -145,18 +150,55 @@ def side_colour_bg(bgr, background, diff_thr=25):
     return _finish(bgr, _blob(m), fg=fg_wide, **SIDE)
 
 
-def side_small(bgr, background, diff_thr=25):
+def pale_mask(bgr, hue=(118, 165), sat=(12, 90), min_v=90):
+    """Pale purple (lilac) brick: low saturation, purple hue. colour_mask leaves it out on purpose
+    (blue-bowl hue range, low saturation); white paper / jaws are below `sat`, the blue bowl above."""
+    hsv = cv2.cvtColor(cv2.GaussianBlur(bgr, (5, 5), 0), cv2.COLOR_BGR2HSV)
+    h, s, v = hsv[..., 0], hsv[..., 1], hsv[..., 2]
+    return ((h >= hue[0]) & (h <= hue[1]) & (s >= sat[0]) & (s <= sat[1]) & (v > min_v)).astype(np.uint8)
+
+
+def arm_window(fg, lower=0.45, pad=0.15):
+    """'Find the robot first': the biggest region that differs from the empty scene is the arm with
+    the brick; the brick hangs at its lower end. Returns (x0, y0, x1, y1, prefer_xy) or None."""
+    n, cc, st, _ = cv2.connectedComponentsWithStats(fg)
+    if n <= 1:
+        return None
+    i = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))
+    x, y, bw, bh, _ = st[i]
+    h, w = fg.shape
+    y0 = y + int((1 - lower) * bh)
+    x0, x1 = max(0, x - int(pad * bw)), min(w, x + bw + int(pad * bw))
+    ys, xs = np.nonzero(cc[y0:y + bh] == i)
+    cx = float(np.median(xs)) if len(xs) else x + bw / 2
+    return x0, y0, x1, min(h, y + bh), (cx, y + 0.85 * bh)
+
+
+def side_small(bgr, background, diff_thr=25, close_px=0, fill_bright=False, open_frac=0.0):
     """Side camera, brick SMALL in the frame (side faces: the arm holds the brick below the jaws,
-    ~70x55 px = ~0.5 % of a 640x480 frame). Same idea as side_colour_bg (coloured AND different from
-    the background) with size limits for a small brick. Pale bricks (lilac) are not found: almost the
-    colour of the white backdrop and jaws - left out of the side dataset on purpose."""
+    ~70x55 px = ~0.5 % of a 640x480 frame). Rule for every colour: 1) find the robot = the biggest
+    region that differs from the empty scene, 2) look for the brick only at its lower end, 3) brick =
+    coloured (colour_mask) or pale purple (pale_mask) AND different from the background."""
     lab = lambda x: cv2.cvtColor(cv2.GaussianBlur(x, (5, 5), 0), cv2.COLOR_BGR2LAB).astype(np.float32)
     d = np.linalg.norm(lab(bgr) - lab(background), axis=-1)
     fg = (d > diff_thr).astype(np.uint8)
     fg = cv2.morphologyEx(fg, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
-    m = colour_mask(bgr, min_s=30) & fg
+    m = (colour_mask(bgr, min_s=30) | pale_mask(bgr)) & fg
+    win = arm_window(fg)
+    prefer = None
+    if win is not None:
+        x0, y0, x1, y1, prefer = win
+        keep = np.zeros_like(m)
+        keep[y0:y1, x0:x1] = 1
+        m = m & keep
     fg_wide = cv2.dilate(fg, np.ones((3, 3), np.uint8))
-    return _finish(bgr, _blob(m, bridge=7, min_frac=0.002), fg=fg_wide, min_area=0.002, **SIDE)
+    extra = None
+    if fill_bright:  # inside the hull, any light pixel that differs from the empty scene is brick
+        v = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)[..., 2]
+        extra = ((v > 110) & (fg > 0)).astype(np.uint8)
+    kw = dict(SIDE) | {"open_frac": open_frac}
+    return _finish(bgr, _blob(m, prefer_xy=prefer, bridge=7, min_frac=0.002), fg=fg_wide, min_area=0.002,
+                   close_px=close_px, allow_extra=extra, **kw)
 
 
 def gripper_roi_clean(bgr, carry_frames, roi=GRIP_ROI, move_thr=1.0, **kw):

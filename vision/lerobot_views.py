@@ -114,12 +114,16 @@ def pick(n: int, k: int) -> list[int]:
 # ---------------------------------------------------------------- helpers
 def colour_of(crop: np.ndarray, mask: np.ndarray) -> str:
     hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)[mask > 0]
-    hsv = hsv[hsv[:, 1] > 60]
+    sat = hsv[hsv[:, 1] > 60]
+    if len(sat) == 0:  # pale brick: decide on the unsaturated pixels (lilac has a purple hue)
+        sat = hsv[hsv[:, 1] > 12]
+    hsv = sat
     if len(hsv) == 0:
         return "unknown"
     ang = hsv[:, 0].astype(np.float32) * np.pi / 90
     h = (np.arctan2(np.sin(ang).mean(), np.cos(ang).mean()) * 90 / np.pi) % 180
-    return "red" if h < 10 or h > 165 else "yellow" if h < 27 else "green" if h < 90 else "other"
+    return ("red" if h < 10 or h > 165 else "yellow" if h < 27 else "green" if h < 90
+            else "lilac" if 118 <= h <= 165 else "other")
 
 
 def split(colours: dict[int, str], test_frac: float, seed: int) -> dict[int, str]:

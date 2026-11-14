@@ -219,17 +219,20 @@ face**), 100–149 "move to the bowl" (no inspection). Only the side camera vide
 ```
 
 - Showing moment = the still segment with the wrist flexed ~90° (found automatically, 48/50).
-- `--side-finder small` (`colour_finders.side_small`): same colour + background-difference idea with
-  size limits for a small brick (~70×55 px, ~0.5 % of the frame; the default finder rejects < 1 %).
-- `dataset/lerobot_side_faces.csv`: 50–84 = side (red, yellow), everything else `none`. Lilac (85–99)
-  is excluded: too pale against the white backdrop / jaws (not found or the table got cut out).
-  No green brick in these recordings.
-- Result: `front_side` 72 train / 27 test crops, all clean (`qa.jpg`).
-- **Quality is not enough yet:** median crop 76 px (stretched ~3.4× to 256), the pose and angle
-  differ per episode (some show the bottom ring at an angle), ~24 distinct training episodes →
-  clean test bricks already score 0.58–1.00, synthetic marks AUROC 0.74, none caught at zero false
-  alarms. Re-record side faces in a **fixed pose, closer to the camera, square-on** (brick ≥ 200 px
-  wide, like the top / bottom close-ups), 20–30 per colour, plus real defective bricks.
+- `--side-finder small` (`colour_finders.side_small`), rule for every colour: 1) find the robot = the
+  biggest region that differs from the empty scene, 2) search the brick only at its lower end (where
+  it hangs below the jaws), 3) brick = coloured (`colour_mask`) or pale purple (`pale_mask`, lilac) AND
+  different from the background; size limits for a small brick (~70×55 px, ~0.5 % of the frame).
+  48/48 showing moments found, red, yellow and lilac (no green brick in these recordings).
+- `dataset/lerobot_side_faces.csv`: 50–99 = side, everything else `none`.
+- Result: `front_side` 100 train / 42 test crops (`qa.jpg`).
+- **Quality is not enough yet:** median crop ~76 px (stretched ~3.4× to 256), the pose and angle
+  differ per episode (some show the bottom ring at an angle), few distinct episodes → clean test
+  bricks already score high; synthetic marks AUROC ~0.67–0.74, none caught at zero false alarms.
+  Re-record side faces in a **fixed pose, closer to the camera, square-on** (brick ≥ 200 px wide,
+  like the top / bottom close-ups), 20–30 per colour, plus real defective bricks.
+- Mask options for experiments (`side_small(..., close_px=, fill_bright=, open_frac=)`): closing,
+  filling the hull with any light foreground pixel, opening. Off by default.
 
 ## Checklist for a new dataset
 
