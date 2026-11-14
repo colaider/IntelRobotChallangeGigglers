@@ -223,3 +223,31 @@ bowl = {"good": "good", "defective": "defective"}.get(res["decision"], "regrasp"
 (or low + band without defective frames); warns when defective frames score below low.
 Named `inspect_brick.py` (not `inspect.py`) so it does not shadow Python's `inspect` module.
 
+
+## 9. Robot collection sessions → compare variants (`sessions.py`, `finders.py`, `experiment.py`)
+
+Raw sessions from `collection/run.py` (Alex) live in `data/<session>/` (gitignored, share as zip):
+per capture one colour image per camera (`ground`, `top`, `gripper`), RealSense depth, arm pose.
+
+```bash
+python vision/sessions.py --sheet ground gripper top     # numbered contact sheets -> results/sessions/sheets/
+# label every capture in dataset/faces.csv: top | bottom | side | none | occluded (ground camera view)
+python vision/experiment.py --qa                         # crop every frame with every finder, QA sheets only
+python vision/experiment.py                              # default grid: ground + gripper, PatchCore
+python vision/experiment.py --cameras ground --finders bg bg_scene \
+    --groupings all per_face per_face_colour --models patchcore padim --clahe off on --name grid2
+```
+
+A variant = camera × finder × grouping × model × CLAHE; all variants share the same captures,
+split and synthetic defects. Finders (`finders.py`): `full` (no crop), `bg` (median background of
+the fixed ground camera, idea from Alex's `anomaly/brick.py`, ~0.1 s), `scene` (`segment.py`,
+~1 s), `bg_scene`, `window` / `window_raw` / `window_tight` (fixed area between the gripper jaws).
+Split per (colour, face) by arm-pose group, ~25 % test. Synthetic marker defects are drawn on the
+**raw** test frames, so every finder must also find and crop the defective brick.
+
+Output `results/experiments/<run>/`: `report.md` + `summary.csv` (AUROC, caught@0FA = defects above
+every good test crop, paired = defect scores above the same frame without it, all also "on brick"
+= max of the heat map inside the eroded brick mask), crop QA sheets, heat-map galleries per variant.
+Crops are cached in `results/experiments/cache/<camera>_<finder>/` (delete to recompute).
+Training here is plain torch on CPU (no Lightning, no export) for speed; benchmark the winner with
+`export.py` + `benchmark.py`.

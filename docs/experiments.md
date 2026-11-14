@@ -312,3 +312,73 @@ mask got trimmed → re-inspect, not a wrong verdict). ~1.0–1.5 s per face on 
 segmentation; the model is ~50 ms.
 Per brick: all-good brick → all faces checked; defect on face 2 of 4 → stop after 2 (early exit);
 doubtful face → re-shot, then `uncertain` (or `defective` with `uncertain_as="defective"`).
+
+## 2026-11-14 — robot collection sessions in `data/` (ground / gripper / top), variant grid (MacBook CPU)
+
+Data: 4 sessions from Alex's `collection/run.py` (red, light_purple, light_green, light_yellow),
+101 captures, good only, arm posed **by hand** (free poses, fingers sometimes in view), 640×480.
+Faces labelled by hand in `dataset/faces.csv` (ground view): top 25, side 25, bottom 21, no brick 21,
+occluded/cut 9. Runner: `vision/experiment.py` (README §9); test = ~25 % of the arm-pose groups per
+(colour, face); 6 synthetic marker defects drawn on each raw test frame (9 ground / 12 gripper frames
+with a clean reference mask -> 54 / 72 defective frames). One seed, small test set: differences of
+a few defects are noise.
+
+**Cameras**
+- `ground` (RealSense low, brick in the gripper): the inspection view. Depth is useless here: 5–20 %
+  valid pixels, the brick is closer than the D415 minimum range.
+- `gripper` (webcam in the gripper): sees the brick in **every** capture, always at the same spot
+  between the jaws, and a different face than `ground` → a second view per pose for free.
+- `top` (RealSense above the table): sees the brick only when the arm is NOT in front of the ground
+  camera, a few dozen pixels big → not an inspection view (brick finding on the table only; its
+  depth is clean, table at ~705 mm).
+
+**Crop QA** (71 ground frames / 92 gripper frames, `results/experiments/qa1`)
+
+| camera | finder | mask quality ok | crop ms | what the crops look like |
+|---|---|---|---|---|
+| ground | `bg` (median background, Alex's idea) | 51/71 | 124 | whole brick every time, sometimes a corner of the jaw |
+| ground | `scene` (`segment.py`) | 44/71 | 931 | picks the white gripper jaw instead of the brick ~9×, slivers |
+| ground | `bg_scene` (bg box → scene) | 42/71 | 1364 | fewer jaw picks, some slivers, one blue bowl |
+| gripper | `window` (scene in the jaw area) | 33/92 | 1088 | often half a brick |
+| gripper | `window_raw` / `window_tight` (fixed crop) | 92/92 | 0 | brick + jaws + changing background |
+
+**Anomaly results** (PatchCore unless noted; `results/experiments/grid1`, `grid2`)
+
+| camera | finder | grouping | AUROC | caught@0FA | paired |
+|---|---|---|---|---|---|
+| ground | full (no crop) | all | 0.39 | 1/54 | – |
+| ground | bg | all | 0.62 | 13/54 | 0.80 |
+| ground | bg | per_face | 0.65 | 24/54 | 0.67 |
+| ground | bg | per_face_colour | 0.69 | 26/54 | 0.63 |
+| ground | bg_scene | per_face_colour | 0.69 | **33/54** | 0.78 |
+| ground | scene | per_face | 0.56 | 15/54 | – |
+| gripper | window | all | **0.84** | 31/72 | 0.76 |
+| gripper | window_tight / window_raw / full | all | 0.51–0.56 | 0–2/72 | – |
+
+caught@0FA = defective crops above every good test crop of the same model; paired = defective crop
+above the same frame without the mark (signal without pose variation).
+
+What we learned
+- **Cropping is mandatory**: full frame is worse than chance (0.39). Alex's median background is the
+  best ground finder here: cleanest crops and 8× faster than `scene`. `segment.py` `scene` alone
+  confuses the white jaw with a pale brick on this camera.
+- **Separate models per face help** (bg: 13 → 24/54), per face + colour a bit more (but with 4–5
+  training frames per model and 1–2 test goods, caught@0FA gets easier; treat as a trend).
+- PatchCore beats PaDiM in every pair; CLAHE and the "on brick" score make no consistent difference.
+- Heat maps put the hot spot exactly on the synthetic mark, but **good crops score as high** because
+  of hand-posed perspective (tilted faces), bits of jaw/background and ~17–19 frames per face for 4
+  colours. Paired 0.6–0.8: on a 640×480 frame tiny dots / dark ink on red barely change the score.
+- The gripper view is promising (0.84 with `window`), but its numbers are biased toward frames where
+  `window` cut the brick cleanly (only those got synthetic defects); fixed crops without segmentation
+  fail because the background behind the brick changes with the arm pose.
+- Alex's `anomaly/` result (AUROC 0.725, all good flagged) came from mixing faces in one model and
+  same-pose frames in train and test, not from the crop.
+
+Next (in order of expected gain)
+1. Collect with the **robot's fixed inspection poses** (`docs/inspection_sequence.md`), 30+ good per
+   face per colour, plus a **separate test session** and **real marker defects**.
+2. Ground camera colour at **1280×720 or higher** for inspection (bricks are 150–250 px wide now).
+3. Ground: `bg` crop (rebuild the background on the station) → per-face PatchCore. Gripper: a better
+   brick finder inside the jaw window (the jaws never move in this camera, so a jaw mask + colour
+   would do) before trusting its numbers.
+4. Then export the winner (`export.py`) and measure CPU / GPU / NPU on the station (`benchmark.py`).
