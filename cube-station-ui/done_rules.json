@@ -1,0 +1,8 @@
+{
+  "source": "SIMULATOR DEMO ONLY — NOT calibrated robot thresholds",
+  "still_trend": 2.0,
+  "still_wobble": 1.5,
+  "done_still_s": 0.6,
+  "trend_window_s": 1.0,
+  "plan_flat": 3
+}

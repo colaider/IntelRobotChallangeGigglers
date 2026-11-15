@@ -1,0 +1,143 @@
+{
+  "cube": 1,
+  "started": "2026-11-15T04:06:54",
+  "finished": "2026-11-15T04:06:54",
+  "verdict": "good",
+  "reason": "All 3 faces good",
+  "steps": [
+    {
+      "name": "PICK",
+      "kind": "VLA",
+      "duration_s": 3.53,
+      "ok": true,
+      "reason": "DONE",
+      "chunks": 2,
+      "attempt": 1
+    },
+    {
+      "name": "SNAP_1",
+      "kind": "SNAP",
+      "duration_s": 1.25,
+      "ok": true,
+      "reason": "DONE",
+      "chunks": 1,
+      "attempt": 1
+    },
+    {
+      "name": "SIDE2",
+      "kind": "VLA",
+      "duration_s": 3.05,
+      "ok": true,
+      "reason": "DONE",
+      "chunks": 2,
+      "attempt": 1
+    },
+    {
+      "name": "SNAP_2",
+      "kind": "SNAP",
+      "duration_s": 1.25,
+      "ok": true,
+      "reason": "DONE",
+      "chunks": 1,
+      "attempt": 1
+    },
+    {
+      "name": "ROLL",
+      "kind": "SCRIPT",
+      "duration_s": 1.77,
+      "ok": true,
+      "reason": "DONE",
+      "chunks": 1,
+      "attempt": 1
+    },
+    {
+      "name": "SNAP_3",
+      "kind": "SNAP",
+      "duration_s": 1.25,
+      "ok": true,
+      "reason": "DONE",
+      "chunks": 1,
+      "attempt": 1
+    },
+    {
+      "name": "DECIDE",
+      "kind": "DECIDE",
+      "duration_s": 0.75,
+      "ok": true,
+      "reason": "DONE",
+      "chunks": 0,
+      "attempt": 1
+    },
+    {
+      "name": "SORT",
+      "kind": "VLA",
+      "duration_s": 3.0,
+      "ok": true,
+      "reason": "DONE",
+      "chunks": 2,
+      "attempt": 1
+    },
+    {
+      "name": "RELEASE",
+      "kind": "SCRIPT",
+      "duration_s": 0.75,
+      "ok": true,
+      "reason": "DONE",
+      "chunks": 0,
+      "attempt": 1
+    },
+    {
+      "name": "HOME",
+      "kind": "SCRIPT",
+      "duration_s": 2.0,
+      "ok": true,
+      "reason": "DONE",
+      "chunks": 1,
+      "attempt": 1
+    }
+  ],
+  "snaps": [
+    {
+      "face": 1,
+      "attempt": 1,
+      "verdict": "good",
+      "score": 0.42,
+      "low": 0.825,
+      "high": 0.975,
+      "find": {
+        "ok": true,
+        "reasons": [],
+        "ms": 45
+      },
+      "images": {}
+    },
+    {
+      "face": 2,
+      "attempt": 1,
+      "verdict": "good",
+      "score": 0.63,
+      "low": 0.825,
+      "high": 0.975,
+      "find": {
+        "ok": true,
+        "reasons": [],
+        "ms": 52
+      },
+      "images": {}
+    },
+    {
+      "face": 3,
+      "attempt": 1,
+      "verdict": "good",
+      "score": 0.58,
+      "low": 0.825,
+      "high": 0.975,
+      "find": {
+        "ok": true,
+        "reasons": [],
+        "ms": 59
+      },
+      "images": {}
+    }
+  ]
+}
