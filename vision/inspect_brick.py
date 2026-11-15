@@ -75,7 +75,8 @@ class Inspector:
 
         t1 = time.perf_counter()
         h, w = self.hw
-        rgb = cv2.cvtColor(cv2.resize(crop, (w, h), interpolation=cv2.INTER_AREA), cv2.COLOR_BGR2RGB)
+        from ov_utils import resize_for_model
+        rgb = cv2.cvtColor(resize_for_model(crop, w, h), cv2.COLOR_BGR2RGB)
         r = self.inf.predict(rgb)
         out["ms"]["model"] = round(1000 * (time.perf_counter() - t1), 1)
 

@@ -19,6 +19,7 @@ indicative only). Re-run after every new dataset.
 Example:
     python vision/build_views.py && python vision/train_views.py
     python vision/train_views.py --variants per_face --cameras front --int8
+    python vision/train_views.py --out results/models_side --cameras front --calibrate-only  # thresholds only
 """
 
 import argparse
@@ -52,6 +53,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--margin", type=float, default=0.03)
     p.add_argument("--device", default="CPU", help="device used for calibration/comparison scoring")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--calibrate-only", action="store_true",
+                   help="no training: re-score the already exported models in --out and rewrite thresholds + compare.md")
     return p.parse_args()
 
 
@@ -145,11 +148,17 @@ def main() -> None:
             if n_train < args.min_train:
                 print(f"  skip {view}: {n_train} training images")
                 continue
-            ckpt = train_view(view, root, args.out, args.seed)
-            if ckpt is None:
-                continue
-            precs = ["fp16"] + (["int8"] if args.int8 else [])
-            xml = export(ckpt, "patchcore", precs, root, args.out / view / "export")["fp16"]
+            if args.calibrate_only:
+                xml = args.out / view / "export/patchcore/fp16/weights/openvino/model.xml"
+                if not xml.exists():
+                    print(f"  skip {view}: no exported model at {xml}")
+                    continue
+            else:
+                ckpt = train_view(view, root, args.out, args.seed)
+                if ckpt is None:
+                    continue
+                precs = ["fp16"] + (["int8"] if args.int8 else [])
+                xml = export(ckpt, "patchcore", precs, root, args.out / view / "export")["fp16"]
             sc = Scorer(xml, args.device)
             scorers[view] = sc
             faces = [face] if face else FACES

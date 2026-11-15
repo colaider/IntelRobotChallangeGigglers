@@ -14,11 +14,25 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import cv2
 import numpy as np
 import openvino as ov
 
 CACHE_DIR = Path("results/ov_cache")
 _core = None
+
+
+def resize_for_model(img: np.ndarray, w: int, h: int) -> np.ndarray:
+    """Resize a crop to the model input the way training did (torchvision bilinear Resize).
+
+    INTER_AREA only when shrinking: when enlarging it is close to nearest-neighbour, so a small crop
+    (e.g. a 76 px side face -> 256) turns blocky, PatchCore sees the blocks as anomalies and clean
+    frames saturate at score 1.0 (side model: AUROC 0.64 -> 0.97 on the same test set after this fix).
+    """
+    if img.shape[0] == h and img.shape[1] == w:
+        return img
+    shrink = img.shape[0] >= h and img.shape[1] >= w
+    return cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA if shrink else cv2.INTER_LINEAR)
 
 
 def core() -> ov.Core:

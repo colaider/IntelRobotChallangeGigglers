@@ -86,7 +86,8 @@ class Scorer:
                 raise ValueError("no brick found in frame")  # robot code: treat as 'uncertain'
             rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
         if self.hw and rgb.shape[:2] != self.hw:
-            rgb = cv2.resize(rgb, (self.hw[1], self.hw[0]), interpolation=cv2.INTER_AREA)
+            from ov_utils import resize_for_model
+            rgb = resize_for_model(rgb, self.hw[1], self.hw[0])
         return self.inf.predict(rgb)
 
 
